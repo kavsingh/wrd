@@ -4,6 +4,7 @@ mod notwordle;
 mod util;
 
 use clap::{Parser, Subcommand};
+use colored::Colorize;
 use matcher::{match_from_pattern, parse_pattern};
 use notwordle::{GuessResult, GuessResultChar, NotWordle};
 
@@ -107,7 +108,7 @@ fn not_wordle_runner(guess_results: &str) {
 		match not_wordle.register_guess_result(result) {
 			Ok((items, parsed_result)) => {
 				println!(
-					"{} remaining after {}:",
+					"{} remaining after {}",
 					items.len(),
 					format_not_wordle_guess_result(&parsed_result)
 				);
@@ -122,8 +123,11 @@ fn not_wordle_runner(guess_results: &str) {
 
 fn format_word_grid(words: &[String]) -> String {
 	words
-		.chunks(10)
-		.map(|c| c.join("\t"))
+		.chunks(14)
+		.map(|c| {
+			c.iter()
+				.fold("".to_string(), |s, c| format!("{}\t{}", s, c.dimmed()))
+		})
 		.collect::<Vec<_>>()
 		.join("\n")
 }
@@ -132,11 +136,9 @@ fn format_not_wordle_guess_result(result: &GuessResult) -> String {
 	result
 		.iter()
 		.map(|result_char| match result_char {
-			GuessResultChar::Right(c) => c,
-			GuessResultChar::Wrong(c) => c,
-			GuessResultChar::WrongPosition(c) => c,
+			GuessResultChar::Right(c) => c.bright_yellow().underline(),
+			GuessResultChar::WrongPosition(c) => c.blue(),
+			GuessResultChar::Wrong(c) => c.dimmed(),
 		})
-		.cloned()
-		.collect::<Vec<String>>()
-		.join("")
+		.fold("".to_string(), |s, c| format!("{}{}", s, c))
 }
