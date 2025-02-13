@@ -4,10 +4,8 @@ mod notwordle;
 mod util;
 
 use clap::{Parser, Subcommand};
-use matcher::match_from_pattern;
-use notwordle::NotWordle;
-
-use crate::matcher::{MatchOperation, MatchPattern};
+use matcher::{match_from_pattern, parse_pattern};
+use notwordle::{GuessResult, GuessResultChar, NotWordle};
 
 /// find those words
 #[derive(Parser, Debug)]
@@ -86,42 +84,38 @@ fn not_wordle_runner(guess_result: &str) {
 
 	for guess in guesses {
 		match not_wordle.register_guess_result(guess) {
-			Ok(items) => {
-				println!("{} remaining after {}:", items.len(), guess);
+			Ok((items, guess_result)) => {
+				println!(
+					"{} remaining after {}:",
+					items.len(),
+					format_not_wordle_guess_result(&guess_result)
+				);
 				print_items = items;
 			}
 			Err(e) => println!("Error: {}", e),
 		};
 	}
 
-	let printable = print_items
+	println!("{}", format_word_grid(&print_items));
+}
+
+fn format_word_grid(words: &[String]) -> String {
+	words
 		.chunks(10)
 		.map(|c| c.join("\t"))
 		.collect::<Vec<_>>()
-		.join("\n");
-
-	println!("{}", printable);
+		.join("\n")
 }
 
-fn parse_pattern(descriptor: &str) -> MatchPattern {
-	descriptor
-		.split(" ")
-		.map(|desc| {
-			if desc.contains("*") {
-				return MatchOperation::MatchAny;
-			}
-
-			let letters: String = desc.chars().filter(|c| c.is_ascii() && *c != '!').collect();
-
-			if letters.is_empty() {
-				panic!("empty or non-ascii descriptors not allowed")
-			}
-
-			if desc.starts_with("!") {
-				MatchOperation::ExcludeAllIn(letters)
-			} else {
-				MatchOperation::MatchAnyIn(letters)
-			}
+fn format_not_wordle_guess_result(result: &GuessResult) -> String {
+	result
+		.iter()
+		.map(|result_char| match result_char {
+			GuessResultChar::Right(c) => c,
+			GuessResultChar::Wrong(c) => c,
+			GuessResultChar::WrongPosition(c) => c,
 		})
-		.collect()
+		.cloned()
+		.collect::<Vec<String>>()
+		.join("")
 }

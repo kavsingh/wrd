@@ -20,6 +20,29 @@ impl PartialEq for MatchOperation {
 
 pub type MatchPattern = Vec<MatchOperation>;
 
+pub fn parse_pattern(descriptor: &str) -> MatchPattern {
+	descriptor
+		.split(" ")
+		.map(|desc| {
+			if desc.contains("*") {
+				return MatchOperation::MatchAny;
+			}
+
+			let letters: String = desc.chars().filter(|c| c.is_ascii() && *c != '!').collect();
+
+			if letters.is_empty() {
+				panic!("empty or non-ascii descriptors not allowed")
+			}
+
+			if desc.starts_with("!") {
+				MatchOperation::ExcludeAllIn(letters)
+			} else {
+				MatchOperation::MatchAnyIn(letters)
+			}
+		})
+		.collect()
+}
+
 pub fn match_from_pattern(pattern: &MatchPattern, include: &str, exclude: &str) -> Vec<String> {
 	get_words()
 		.iter()

@@ -14,10 +14,10 @@ pub struct NotWordle {
 	guess_results: Vec<GuessResult>,
 }
 
-type GuessResult = Vec<GuessResultChar>;
+pub type GuessResult = Vec<GuessResultChar>;
 
 #[derive(Clone, Debug)]
-enum GuessResultChar {
+pub enum GuessResultChar {
 	Right(String),
 	Wrong(String),
 	WrongPosition(String),
@@ -36,14 +36,18 @@ impl PartialEq for GuessResultChar {
 
 impl NotWordle {
 	// p ?q -r -s -t
-	pub fn register_guess_result(&mut self, result_pattern: &str) -> Result<Vec<String>, String> {
-		self.guess_results
-			.push(parse_result_pattern(result_pattern)?);
+	pub fn register_guess_result(
+		&mut self,
+		result_pattern: &str,
+	) -> Result<(Vec<String>, GuessResult), String> {
+		let guess_result = parse_result_pattern(result_pattern)?;
+
+		self.guess_results.push(guess_result.clone());
 
 		let (pattern, include, exclude) = get_match_args_from_results(&self.guess_results);
 		let matches = match_from_pattern(&pattern, &include, &exclude);
 
-		Ok(matches)
+		Ok((matches, guess_result))
 	}
 }
 
