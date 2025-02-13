@@ -54,15 +54,15 @@ fn main() {
 			exclude,
 			include,
 		}) => {
-			match_command(pattern, include, exclude);
+			match_command_runner(pattern, include, exclude);
 		}
 		None => panic!("expected a command"),
 	}
 }
 
-fn match_command(pattern: &str, include: &str, exclude: &str) {
+fn match_command_runner(pattern: &str, include: &str, exclude: &str) {
 	let pattern = parse_pattern(pattern);
-	let result = match_from_pattern(&pattern, &include.to_string(), &exclude.to_string());
+	let result = match_from_pattern(&pattern, include, exclude);
 
 	println!("{}", result.join("\n"))
 }

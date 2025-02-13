@@ -9,11 +9,7 @@ pub enum MatchOperation {
 
 pub type MatchPattern = Vec<MatchOperation>;
 
-pub fn match_from_pattern(
-	pattern: &MatchPattern,
-	include: &String,
-	exclude: &String,
-) -> Vec<String> {
+pub fn match_from_pattern(pattern: &MatchPattern, include: &str, exclude: &str) -> Vec<String> {
 	get_words()
 		.iter()
 		.filter(|word| {
@@ -41,15 +37,11 @@ pub fn match_from_pattern(
 						if !letters.chars().any(|l| l == char) {
 							return false;
 						}
-
-						continue;
 					}
 					MatchOperation::ExcludeAllIn(letters) => {
 						if letters.chars().any(|l| l == char) {
 							return false;
 						}
-
-						continue;
 					}
 				}
 			}
