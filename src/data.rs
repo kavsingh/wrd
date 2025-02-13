@@ -36,8 +36,12 @@ fn parse_words_json() -> Vec<String> {
 		.as_array()
 		.expect("expected words.json to be array of strings");
 
-	values
+	let mut strings: Vec<String> = values
 		.iter()
 		.filter_map(|val| val.as_str().map(|s| s.to_string()))
-		.collect()
+		.collect();
+
+	strings.sort_unstable();
+
+	strings
 }
