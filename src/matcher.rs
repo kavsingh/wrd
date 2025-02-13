@@ -1,10 +1,21 @@
 use crate::data::get_words;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum MatchOperation {
 	MatchAny,
 	MatchAnyIn(String),
 	ExcludeAllIn(String),
+}
+
+impl PartialEq for MatchOperation {
+	fn eq(&self, other: &Self) -> bool {
+		match (self, other) {
+			(Self::MatchAny, Self::MatchAny) => true,
+			(Self::MatchAnyIn(a), Self::MatchAnyIn(b)) => a == b,
+			(Self::ExcludeAllIn(a), Self::ExcludeAllIn(b)) => a == b,
+			_ => false,
+		}
+	}
 }
 
 pub type MatchPattern = Vec<MatchOperation>;

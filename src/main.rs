@@ -1,8 +1,11 @@
 mod data;
 mod matcher;
+mod notwordle;
+mod util;
 
 use clap::{Parser, Subcommand};
 use matcher::match_from_pattern;
+use notwordle::NotWordle;
 
 use crate::matcher::{MatchOperation, MatchPattern};
 
@@ -43,6 +46,12 @@ enum Commands {
 		#[arg(short, long, default_value_t = ("").to_string())]
 		include: String,
 	},
+
+	// see whats left from subsequent guesses
+	Nw {
+		#[arg(short, long)]
+		guess_result: String,
+	},
 }
 
 fn main() {
@@ -54,17 +63,42 @@ fn main() {
 			exclude,
 			include,
 		}) => {
-			match_command_runner(pattern, include, exclude);
+			match_runner(pattern, include, exclude);
+		}
+		Some(Commands::Nw { guess_result }) => {
+			not_wordle_runner(guess_result);
 		}
 		None => panic!("expected a command"),
 	}
 }
 
-fn match_command_runner(pattern: &str, include: &str, exclude: &str) {
+fn match_runner(pattern: &str, include: &str, exclude: &str) {
 	let pattern = parse_pattern(pattern);
 	let result = match_from_pattern(&pattern, include, exclude);
 
 	println!("{}", result.join("\n"))
+}
+
+fn not_wordle_runner(guess_result: &str) {
+	let mut not_wordle = NotWordle::default();
+	let guesses: Vec<&str> = guess_result.split(",").collect();
+
+	for guess in guesses {
+		match not_wordle.register_guess_result(guess) {
+			Ok(items) => println!(
+				"{} remaining after {}:\n{}",
+				items.len(),
+				guess,
+				items
+					.iter()
+					.take(20)
+					.cloned()
+					.collect::<Vec<_>>()
+					.join("\n")
+			),
+			Err(e) => println!("Error: {}", e),
+		};
+	}
 }
 
 fn parse_pattern(descriptor: &str) -> MatchPattern {
