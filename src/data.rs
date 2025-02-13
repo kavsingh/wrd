@@ -28,13 +28,13 @@ fn parse_words_json() -> Vec<String> {
 		];
 	}
 
-	let words = Assets::get("words.json").expect("no words.json found");
+	let words = Assets::get("words.json").expect("could not get dictionary");
 	let words_string =
-		std::str::from_utf8(words.data.as_ref()).expect("could not convert words.json to string");
-	let json = serde_json::from_str::<Value>(words_string).expect("invalid words.json");
+		std::str::from_utf8(words.data.as_ref()).expect("could not convert dictionary to string");
+	let json = serde_json::from_str::<Value>(words_string).expect("invalid dictionary json");
 	let values = json
 		.as_array()
-		.expect("expected words.json to be array of strings");
+		.expect("expected dictionary to be array of strings");
 
 	let mut strings: Vec<String> = values
 		.iter()
