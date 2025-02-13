@@ -45,10 +45,31 @@ enum Commands {
 		include: String,
 	},
 
-	// see whats left from subsequent guesses
+	// see words left after guesses
 	Nw {
+		/// guess results: comma seperated list of guess results
+		///
+		/// a guess result is a space seperated list of the results of a guess:
+		///   - single a-z: letter in correct position
+		///   - ? + single a-z: letter in word but in wrong position
+		///   - ! + single a-z: letter not in word
+		///
+		/// e.g. encoding the result of the guess "plate" where
+		///   - 'p' is in correct position
+		///   - 'l' is in word but in wrong position
+		///   - 'a' is not in word
+		///   - 't' is in word but in wrong position
+		///   - 'e' is in correct position
+		///
+		///   enter as: 'p ?l !a ?t e'
+		///
+		///   to see words remaning from compounding guesses, provide a comma
+		///   seperated list of results
+		///
+		///   'p ?l !a ?t e,p ?o l ?i t'
+		///
 		#[arg(short, long)]
-		guess_result: String,
+		guess_results: String,
 	},
 }
 
@@ -63,8 +84,8 @@ fn main() {
 		}) => {
 			match_runner(pattern, include, exclude);
 		}
-		Some(Commands::Nw { guess_result }) => {
-			not_wordle_runner(guess_result);
+		Some(Commands::Nw { guess_results }) => {
+			not_wordle_runner(guess_results);
 		}
 		None => panic!("expected a command"),
 	}
@@ -77,18 +98,18 @@ fn match_runner(pattern: &str, include: &str, exclude: &str) {
 	println!("{}", result.join("\n"))
 }
 
-fn not_wordle_runner(guess_result: &str) {
+fn not_wordle_runner(guess_results: &str) {
 	let mut not_wordle = NotWordle::default();
-	let guesses: Vec<&str> = guess_result.split(",").collect();
+	let results: Vec<&str> = guess_results.split(",").collect();
 	let mut print_items: Vec<String> = vec![];
 
-	for guess in guesses {
-		match not_wordle.register_guess_result(guess) {
-			Ok((items, guess_result)) => {
+	for result in results {
+		match not_wordle.register_guess_result(result) {
+			Ok((items, parsed_result)) => {
 				println!(
 					"{} remaining after {}:",
 					items.len(),
-					format_not_wordle_guess_result(&guess_result)
+					format_not_wordle_guess_result(&parsed_result)
 				);
 				print_items = items;
 			}
