@@ -62,9 +62,7 @@ fn main() {
 
 fn match_command(pattern: &str, include: &str, exclude: &str) {
 	let pattern = parse_pattern(pattern);
-	let include: Vec<&str> = include.split("").filter(|c| !c.is_empty()).collect();
-	let exclude: Vec<&str> = exclude.split("").filter(|c| !c.is_empty()).collect();
-	let result = match_from_pattern(&pattern, &include, &exclude);
+	let result = match_from_pattern(&pattern, &include.to_string(), &exclude.to_string());
 
 	println!("{}", result.join("\n"))
 }
@@ -74,29 +72,19 @@ fn parse_pattern(descriptor: &str) -> MatchPattern {
 		.split("_")
 		.map(|desc| {
 			if desc.contains("*") {
-				return MatchOperation::MatchAnything;
+				return MatchOperation::MatchAny;
 			}
 
-			let letters: Vec<String> = desc
-				.replacen("!", "", 1)
-				.split("")
-				.filter_map(|c| {
-					if c.is_empty() {
-						None
-					} else {
-						Some(c.to_string())
-					}
-				})
-				.collect();
+			let letters: String = desc.chars().filter(|c| c.is_ascii() && *c != '!').collect();
 
 			if letters.is_empty() {
-				panic!("empty descriptors not allowed")
+				panic!("empty or non-ascii descriptors not allowed")
 			}
 
 			if desc.starts_with("!") {
-				MatchOperation::ExcludeAllOf(letters)
+				MatchOperation::ExcludeAllIn(letters)
 			} else {
-				MatchOperation::MatchOneOf(letters)
+				MatchOperation::MatchAnyIn(letters)
 			}
 		})
 		.collect()
