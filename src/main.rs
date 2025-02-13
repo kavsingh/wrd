@@ -19,13 +19,13 @@ enum Commands {
 	/// find matches from patterns
 	Match {
 		/// match pattern
-		/// _: seperator for char positions
+		/// character positions seperated by space
 		/// *: match anything in this position
 		/// any number of lowercase chars: match any of the chars in the string in this position
 		/// ! + any number of lowercase chars: exclude any of the chars in the string in this position
 		///
 		/// e.g.
-		///   *_b_!ar_!r_*
+		///   '* b !ar !r *'
 		///
 		///   1st position - match anything
 		///   2nd position - match 'b'
@@ -69,7 +69,7 @@ fn match_command_runner(pattern: &str, include: &str, exclude: &str) {
 
 fn parse_pattern(descriptor: &str) -> MatchPattern {
 	descriptor
-		.split("_")
+		.split(" ")
 		.map(|desc| {
 			if desc.contains("*") {
 				return MatchOperation::MatchAny;
