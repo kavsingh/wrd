@@ -13,7 +13,20 @@ pub fn get_words() -> &'static Vec<String> {
 }
 
 fn parse_words_json() -> Vec<String> {
-	dbg!("collecting words.json to vec");
+	if cfg!(test) {
+		return vec![
+			"aaabbb".to_string(),
+			"bbbccc".to_string(),
+			"cccddd".to_string(),
+			"dddeee".to_string(),
+			"eeefff".to_string(),
+			"fffggg".to_string(),
+			"gghhii".to_string(),
+			"iijjkk".to_string(),
+			"jjkk".to_string(),
+			"kkll".to_string(),
+		];
+	}
 
 	let words = Assets::get("words.json").expect("no words.json found");
 	let words_string =

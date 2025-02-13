@@ -51,3 +51,40 @@ pub fn match_from_pattern(pattern: &MatchPattern, include: &str, exclude: &str) 
 		.cloned()
 		.collect()
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn should_match_on_pattern_length() {
+		let pattern = vec![
+			MatchOperation::MatchAny,
+			MatchOperation::MatchAny,
+			MatchOperation::MatchAny,
+			MatchOperation::MatchAny,
+		];
+
+		assert_eq!(
+			match_from_pattern(&pattern, "", ""),
+			vec!["jjkk".to_string(), "kkll".to_string()]
+		);
+	}
+
+	#[test]
+	fn should_match_on_pattern() {
+		let pattern = vec![
+			MatchOperation::MatchAny,
+			MatchOperation::MatchAnyIn("ab".to_string()),
+			MatchOperation::ExcludeAllIn("cd".to_string()),
+			MatchOperation::MatchAny,
+			MatchOperation::MatchAny,
+			MatchOperation::MatchAny,
+		];
+
+		assert_eq!(
+			match_from_pattern(&pattern, "", ""),
+			vec!["aaabbb".to_string(), "bbbccc".to_string()]
+		);
+	}
+}
