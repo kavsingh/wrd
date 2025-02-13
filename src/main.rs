@@ -82,23 +82,25 @@ fn match_runner(pattern: &str, include: &str, exclude: &str) {
 fn not_wordle_runner(guess_result: &str) {
 	let mut not_wordle = NotWordle::default();
 	let guesses: Vec<&str> = guess_result.split(",").collect();
+	let mut print_items: Vec<String> = vec![];
 
 	for guess in guesses {
 		match not_wordle.register_guess_result(guess) {
-			Ok(items) => println!(
-				"{} remaining after {}:\n{}",
-				items.len(),
-				guess,
-				items
-					.iter()
-					.take(20)
-					.cloned()
-					.collect::<Vec<_>>()
-					.join("\n")
-			),
+			Ok(items) => {
+				println!("{} remaining after {}:", items.len(), guess);
+				print_items = items;
+			}
 			Err(e) => println!("Error: {}", e),
 		};
 	}
+
+	let printable = print_items
+		.chunks(10)
+		.map(|c| c.join("\t"))
+		.collect::<Vec<_>>()
+		.join("\n");
+
+	println!("{}", printable);
 }
 
 fn parse_pattern(descriptor: &str) -> MatchPattern {
