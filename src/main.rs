@@ -19,7 +19,7 @@ struct Cli {
 #[derive(Subcommand, Debug)]
 enum Commands {
 	/// find matches from patterns
-	Match {
+	Mp {
 		/// match pattern
 		/// character positions seperated by space
 		/// *: match anything in this position
@@ -78,7 +78,7 @@ fn main() {
 	let cli = Cli::parse();
 
 	match &cli.command {
-		Some(Commands::Match {
+		Some(Commands::Mp {
 			pattern,
 			exclude,
 			include,
@@ -96,7 +96,7 @@ fn match_runner(pattern: &str, include: &str, exclude: &str) {
 	let pattern = parse_pattern(pattern);
 	let result = match_from_pattern(&pattern, include, exclude);
 
-	println!("{}", result.join("\n"))
+	println!("{}", format_word_grid(&result));
 }
 
 fn not_wordle_runner(guess_results: &str) {
