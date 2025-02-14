@@ -1,13 +1,13 @@
 use crate::data::get_words;
 
 #[derive(Clone, Debug)]
-pub enum MatchOperation {
+pub enum MatchPatternToken {
 	MatchAny,
 	MatchAnyIn(String),
 	ExcludeAllIn(String),
 }
 
-impl PartialEq for MatchOperation {
+impl PartialEq for MatchPatternToken {
 	fn eq(&self, other: &Self) -> bool {
 		match (self, other) {
 			(Self::MatchAny, Self::MatchAny) => true,
@@ -18,14 +18,12 @@ impl PartialEq for MatchOperation {
 	}
 }
 
-pub type MatchPattern = Vec<MatchOperation>;
-
-pub fn parse_pattern(descriptor: &str) -> MatchPattern {
-	descriptor
+pub fn tokenize_pattern(input: &str) -> Vec<MatchPatternToken> {
+	input
 		.split(" ")
 		.map(|desc| {
 			if desc.contains("*") {
-				return MatchOperation::MatchAny;
+				return MatchPatternToken::MatchAny;
 			}
 
 			let letters: String = desc.chars().filter(|c| c.is_ascii() && *c != '!').collect();
@@ -35,24 +33,26 @@ pub fn parse_pattern(descriptor: &str) -> MatchPattern {
 			}
 
 			if desc.starts_with("!") {
-				MatchOperation::ExcludeAllIn(letters)
+				MatchPatternToken::ExcludeAllIn(letters)
 			} else {
-				MatchOperation::MatchAnyIn(letters)
+				MatchPatternToken::MatchAnyIn(letters)
 			}
 		})
 		.collect()
 }
 
-pub fn match_from_pattern(
-	pattern: &MatchPattern,
+pub fn match_words(
+	tokens: &[MatchPatternToken],
 	include: &str,
 	exclude: &str,
 	within: &str,
+	words: Option<&Vec<String>>,
 ) -> Vec<String> {
-	get_words()
+	words
+		.unwrap_or(get_words())
 		.iter()
 		.filter(|word| {
-			if word.len() != pattern.len() {
+			if word.len() != tokens.len() {
 				return false;
 			}
 
@@ -72,23 +72,19 @@ pub fn match_from_pattern(
 			}
 
 			for (i, char) in word.chars().enumerate() {
-				let matcher = match pattern.get(i) {
-					Some(op) => op,
+				match tokens.get(i) {
+					Some(MatchPatternToken::MatchAny) => continue,
+					Some(MatchPatternToken::MatchAnyIn(chars)) => {
+						if !chars.chars().any(|l| l == char) {
+							return false;
+						}
+					}
+					Some(MatchPatternToken::ExcludeAllIn(chars)) => {
+						if chars.chars().any(|l| l == char) {
+							return false;
+						}
+					}
 					None => continue,
-				};
-
-				match matcher {
-					MatchOperation::MatchAny => continue,
-					MatchOperation::MatchAnyIn(letters) => {
-						if !letters.chars().any(|l| l == char) {
-							return false;
-						}
-					}
-					MatchOperation::ExcludeAllIn(letters) => {
-						if letters.chars().any(|l| l == char) {
-							return false;
-						}
-					}
 				}
 			}
 
@@ -105,14 +101,14 @@ mod tests {
 	#[test]
 	fn should_match_on_pattern_length() {
 		let pattern = vec![
-			MatchOperation::MatchAny,
-			MatchOperation::MatchAny,
-			MatchOperation::MatchAny,
-			MatchOperation::MatchAny,
+			MatchPatternToken::MatchAny,
+			MatchPatternToken::MatchAny,
+			MatchPatternToken::MatchAny,
+			MatchPatternToken::MatchAny,
 		];
 
 		assert_eq!(
-			match_from_pattern(&pattern, "", "", ""),
+			match_words(&pattern, "", "", "", None),
 			vec!["jjkk".to_string(), "kkll".to_string()]
 		);
 	}
@@ -120,16 +116,16 @@ mod tests {
 	#[test]
 	fn should_match_on_pattern() {
 		let pattern = vec![
-			MatchOperation::MatchAny,
-			MatchOperation::MatchAnyIn("ab".to_string()),
-			MatchOperation::ExcludeAllIn("cd".to_string()),
-			MatchOperation::MatchAny,
-			MatchOperation::MatchAny,
-			MatchOperation::MatchAny,
+			MatchPatternToken::MatchAny,
+			MatchPatternToken::MatchAnyIn("ab".to_string()),
+			MatchPatternToken::ExcludeAllIn("cd".to_string()),
+			MatchPatternToken::MatchAny,
+			MatchPatternToken::MatchAny,
+			MatchPatternToken::MatchAny,
 		];
 
 		assert_eq!(
-			match_from_pattern(&pattern, "", "", ""),
+			match_words(&pattern, "", "", "", None),
 			vec!["aaabbb".to_string(), "bbbccc".to_string()]
 		);
 	}
@@ -137,15 +133,15 @@ mod tests {
 	#[test]
 	fn should_match_on_pattern_within_pool() {
 		let pattern = vec![
-			MatchOperation::MatchAny,
-			MatchOperation::MatchAny,
-			MatchOperation::MatchAny,
-			MatchOperation::MatchAny,
-			MatchOperation::MatchAny,
+			MatchPatternToken::MatchAny,
+			MatchPatternToken::MatchAny,
+			MatchPatternToken::MatchAny,
+			MatchPatternToken::MatchAny,
+			MatchPatternToken::MatchAny,
 		];
 
 		assert_eq!(
-			match_from_pattern(&pattern, "t", "", "ytanpem"),
+			match_words(&pattern, "t", "", "ytanpem", None),
 			vec!["yenta".to_string()]
 		);
 	}

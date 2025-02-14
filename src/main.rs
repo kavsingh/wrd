@@ -1,12 +1,13 @@
 mod data;
-mod matcher;
+mod match_pattern;
 mod notwordle;
 mod util;
 
 use clap::{Parser, Subcommand};
 use colored::Colorize;
-use matcher::{match_from_pattern, parse_pattern};
-use notwordle::{GuessResult, GuessResultChar, NotWordle};
+
+use crate::match_pattern::{match_words, tokenize_pattern};
+use crate::notwordle::{GuessResultToken, Notwordle};
 
 /// find those words
 #[derive(Parser, Debug)]
@@ -91,31 +92,31 @@ fn main() {
 			match_runner(pattern, include, exclude, within);
 		}
 		Some(Commands::Nw { guess_results }) => {
-			not_wordle_runner(guess_results);
+			notwordle_runner(guess_results);
 		}
 		None => panic!("expected a command"),
 	}
 }
 
 fn match_runner(pattern: &str, include: &str, exclude: &str, within: &str) {
-	let pattern = parse_pattern(pattern);
-	let result = match_from_pattern(&pattern, include, exclude, within);
+	let tokens = tokenize_pattern(pattern);
+	let result = match_words(&tokens, include, exclude, within, None);
 
 	println!("{}", format_word_grid(&result));
 }
 
-fn not_wordle_runner(guess_results: &str) {
-	let mut not_wordle = NotWordle::default();
+fn notwordle_runner(guess_results: &str) {
+	let mut notwordle = Notwordle::default();
 	let results: Vec<&str> = guess_results.split(",").collect();
 	let mut print_items: Vec<String> = vec![];
 
 	for result in results {
-		match not_wordle.register_guess_result(result) {
+		match notwordle.register_guess_result(result) {
 			Ok((items, parsed_result)) => {
 				println!(
 					"{} remaining after {}",
 					items.len(),
-					format_not_wordle_guess_result(&parsed_result)
+					format_notwordle_guess_result(&parsed_result)
 				);
 				print_items = items;
 			}
@@ -137,13 +138,13 @@ fn format_word_grid(words: &[String]) -> String {
 		.join("\n")
 }
 
-fn format_not_wordle_guess_result(result: &GuessResult) -> String {
+fn format_notwordle_guess_result(result: &[GuessResultToken]) -> String {
 	result
 		.iter()
 		.map(|result_char| match result_char {
-			GuessResultChar::Right(c) => c.bright_yellow().underline(),
-			GuessResultChar::WrongPosition(c) => c.blue(),
-			GuessResultChar::Wrong(c) => c.dimmed(),
+			GuessResultToken::Right(c) => c.bright_yellow().underline(),
+			GuessResultToken::WrongPosition(c) => c.blue(),
+			GuessResultToken::Wrong(c) => c.dimmed(),
 		})
 		.fold("".to_string(), |s, c| format!("{}{}", s, c))
 }

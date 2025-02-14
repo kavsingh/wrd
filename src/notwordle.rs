@@ -3,27 +3,25 @@ use std::sync::OnceLock;
 use regex::Regex;
 
 use crate::{
-	matcher::{match_from_pattern, MatchOperation, MatchPattern},
+	match_pattern::{match_words, MatchPatternToken},
 	util::unique_string,
 };
 
 static GUESS_PART_REGEX: OnceLock<Regex> = OnceLock::new();
 
 #[derive(Default)]
-pub struct NotWordle {
-	guess_results: Vec<GuessResult>,
+pub struct Notwordle {
+	guess_results: Vec<Vec<GuessResultToken>>,
 }
 
-pub type GuessResult = Vec<GuessResultChar>;
-
 #[derive(Clone, Debug)]
-pub enum GuessResultChar {
+pub enum GuessResultToken {
 	Right(String),
 	Wrong(String),
 	WrongPosition(String),
 }
 
-impl PartialEq for GuessResultChar {
+impl PartialEq for GuessResultToken {
 	fn eq(&self, other: &Self) -> bool {
 		match (self, other) {
 			(Self::Right(a), Self::Right(b)) => a == b,
@@ -34,28 +32,40 @@ impl PartialEq for GuessResultChar {
 	}
 }
 
-impl NotWordle {
+impl Notwordle {
 	// p ?q -r -s -t
 	pub fn register_guess_result(
 		&mut self,
-		result_pattern: &str,
-	) -> Result<(Vec<String>, GuessResult), String> {
-		let guess_result = parse_result_pattern(result_pattern)?;
+		result: &str,
+	) -> Result<(Vec<String>, Vec<GuessResultToken>), String> {
+		let new_result = tokenize_guess_result(result)?;
 
-		self.guess_results.push(guess_result.clone());
+		if let Some(stored) = self.guess_results.last() {
+			let stored_len = stored.len();
+			let new_len = new_result.len();
 
-		let (pattern, include, exclude) = get_match_args_from_results(&self.guess_results);
-		let matches = match_from_pattern(&pattern, &include, &exclude, "");
+			if stored_len != new_len {
+				return Err(format!(
+					"previous had {} items, got {} items",
+					stored_len, new_len
+				));
+			}
+		}
 
-		Ok((matches, guess_result))
+		self.guess_results.push(new_result.clone());
+
+		let (tokens, include, exclude) = get_match_args_from_results(&self.guess_results);
+		let matches = match_words(&tokens, &include, &exclude, "", None);
+
+		Ok((matches, new_result))
 	}
 }
 
-fn parse_result_pattern(result_pattern: &str) -> Result<GuessResult, String> {
+fn tokenize_guess_result(input: &str) -> Result<Vec<GuessResultToken>, String> {
 	let regex = GUESS_PART_REGEX
 		.get_or_init(|| Regex::new(r"^([!?]{1})?([a-z]{1})$").expect("invalid guess regex"));
 
-	let patterns: Vec<&str> = result_pattern
+	let entries: Vec<&str> = input
 		.split(" ")
 		.filter_map(|p| {
 			let trimmed = p.trim();
@@ -68,82 +78,80 @@ fn parse_result_pattern(result_pattern: &str) -> Result<GuessResult, String> {
 		})
 		.collect();
 
-	if patterns.len() != 5 {
-		return Err("expected 5 guess entries".into());
-	}
+	let mut result: Vec<GuessResultToken> = vec![];
 
-	let mut result: GuessResult = vec![];
-
-	for patt in patterns.iter() {
-		let captures = match regex.captures(patt) {
+	for entry in entries.iter() {
+		let captures = match regex.captures(entry) {
 			Some(cap) => cap,
-			None => return Err(format!("invalid pattern {}", patt)),
+			None => return Err(format!("invalid pattern {}", entry)),
 		};
 
 		let char = match captures.get(2) {
 			Some(c) => c.as_str(),
-			None => return Err(format!("no value in pattern {}", patt)),
+			None => return Err(format!("no value in pattern {}", entry)),
 		};
 
 		let op = captures.get(1).map(|m| m.as_str()).unwrap_or("");
 
 		match op {
-			"!" => result.push(GuessResultChar::Wrong(char.to_string())),
-			"?" => result.push(GuessResultChar::WrongPosition(char.to_string())),
-			_ => result.push(GuessResultChar::Right(char.to_string())),
+			"!" => result.push(GuessResultToken::Wrong(char.to_string())),
+			"?" => result.push(GuessResultToken::WrongPosition(char.to_string())),
+			_ => result.push(GuessResultToken::Right(char.to_string())),
 		}
 	}
 
 	Ok(result)
 }
 
-fn get_match_args_from_results(guess_results: &[GuessResult]) -> (MatchPattern, String, String) {
+fn get_match_args_from_results(
+	guess_results: &[Vec<GuessResultToken>],
+) -> (Vec<MatchPatternToken>, String, String) {
 	let mut include = "".to_string();
 	let mut exclude = "".to_string();
-	let mut match_pattern: MatchPattern = vec![];
+	let mut match_tokens: Vec<MatchPatternToken> = vec![];
 
 	for result in guess_results {
 		for (i, result_char) in result.iter().enumerate() {
 			match result_char {
-				GuessResultChar::Right(c) | GuessResultChar::WrongPosition(c) => {
+				GuessResultToken::Right(c) | GuessResultToken::WrongPosition(c) => {
 					include.push_str(c);
 				}
-				GuessResultChar::Wrong(c) => {
+				GuessResultToken::Wrong(c) => {
 					exclude.push_str(c);
 				}
 			}
 
 			let resolved_op = match result_char {
-				GuessResultChar::Right(c) => MatchOperation::MatchAnyIn(c.to_string()),
-				GuessResultChar::WrongPosition(c) | GuessResultChar::Wrong(c) => {
-					let candidate_op = MatchOperation::ExcludeAllIn(c.to_string());
-					let current_op = match_pattern.get(i);
+				GuessResultToken::Right(c) => MatchPatternToken::MatchAnyIn(c.to_string()),
+				GuessResultToken::WrongPosition(c) | GuessResultToken::Wrong(c) => {
+					let candidate_op = MatchPatternToken::ExcludeAllIn(c.to_string());
+					let current_op = match_tokens.get(i);
 
 					match (&candidate_op, current_op) {
 						(
-							MatchOperation::ExcludeAllIn(a),
-							Some(MatchOperation::ExcludeAllIn(b)),
+							MatchPatternToken::ExcludeAllIn(a),
+							Some(MatchPatternToken::ExcludeAllIn(b)),
 						) => {
 							let mut joined = b.to_owned();
 
 							joined.push_str(&a.clone());
-							MatchOperation::ExcludeAllIn(unique_string(&joined))
+							MatchPatternToken::ExcludeAllIn(unique_string(&joined))
 						}
 						_ => candidate_op,
 					}
 				}
 			};
 
-			if i < match_pattern.len() {
-				match_pattern[i] = resolved_op;
+			if i < match_tokens.len() {
+				match_tokens[i] = resolved_op;
 			} else {
-				match_pattern.push(resolved_op);
+				match_tokens.push(resolved_op);
 			}
 		}
 	}
 
 	(
-		match_pattern,
+		match_tokens,
 		unique_string(&include),
 		unique_string(&exclude),
 	)
@@ -151,29 +159,13 @@ fn get_match_args_from_results(guess_results: &[GuessResult]) -> (MatchPattern, 
 
 #[cfg(test)]
 mod tests {
-	use crate::matcher::MatchOperation;
+	use crate::match_pattern::MatchPatternToken;
 
 	use super::*;
 
 	#[test]
-	fn should_error_if_incorrect_guess_parts() {
-		let four = match parse_result_pattern("p q r s") {
-			Ok(_) => panic!("should not pass"),
-			Err(message) => message,
-		};
-
-		let six = match parse_result_pattern("p q r s") {
-			Ok(_) => panic!("should not pass"),
-			Err(message) => message,
-		};
-
-		assert_eq!(four, "expected 5 guess entries");
-		assert_eq!(six, "expected 5 guess entries");
-	}
-
-	#[test]
 	fn should_error_on_incorrect_pattern() {
-		let result = match parse_result_pattern("p ?q !r s aa") {
+		let result = match tokenize_guess_result("p ?q !r aa") {
 			Ok(_) => panic!("should not pass"),
 			Err(message) => message,
 		};
@@ -183,16 +175,16 @@ mod tests {
 
 	#[test]
 	fn should_parse_guess_patterns() -> Result<(), String> {
-		let result = parse_result_pattern("p ?l !a t !e")?;
+		let result = tokenize_guess_result("p ?l !a t !e")?;
 
 		assert_eq!(
 			result,
 			vec![
-				GuessResultChar::Right("p".to_string()),
-				GuessResultChar::WrongPosition("l".to_string()),
-				GuessResultChar::Wrong("a".to_string()),
-				GuessResultChar::Right("t".to_string()),
-				GuessResultChar::Wrong("e".to_string()),
+				GuessResultToken::Right("p".to_string()),
+				GuessResultToken::WrongPosition("l".to_string()),
+				GuessResultToken::Wrong("a".to_string()),
+				GuessResultToken::Right("t".to_string()),
+				GuessResultToken::Wrong("e".to_string()),
 			]
 		);
 
@@ -204,12 +196,12 @@ mod tests {
 		// word is pilot
 
 		// plate
-		let first_guess: GuessResult = vec![
-			GuessResultChar::Right("p".to_string()),
-			GuessResultChar::WrongPosition("l".to_string()),
-			GuessResultChar::Wrong("a".to_string()),
-			GuessResultChar::WrongPosition("t".to_string()),
-			GuessResultChar::Wrong("e".to_string()),
+		let first_guess = vec![
+			GuessResultToken::Right("p".to_string()),
+			GuessResultToken::WrongPosition("l".to_string()),
+			GuessResultToken::Wrong("a".to_string()),
+			GuessResultToken::WrongPosition("t".to_string()),
+			GuessResultToken::Wrong("e".to_string()),
 		];
 
 		let guesses = vec![first_guess.clone()];
@@ -220,24 +212,24 @@ mod tests {
 		assert_eq!(
 			pattern,
 			vec![
-				MatchOperation::MatchAnyIn("p".to_string()),
-				MatchOperation::ExcludeAllIn("l".to_string()),
-				MatchOperation::ExcludeAllIn("a".to_string()),
-				MatchOperation::ExcludeAllIn("t".to_string()),
-				MatchOperation::ExcludeAllIn("e".to_string()),
+				MatchPatternToken::MatchAnyIn("p".to_string()),
+				MatchPatternToken::ExcludeAllIn("l".to_string()),
+				MatchPatternToken::ExcludeAllIn("a".to_string()),
+				MatchPatternToken::ExcludeAllIn("t".to_string()),
+				MatchPatternToken::ExcludeAllIn("e".to_string()),
 			]
 		);
 
 		// polit (whatever)
 		let second_guess = vec![
-			GuessResultChar::Right("p".to_string()),
-			GuessResultChar::WrongPosition("o".to_string()),
-			GuessResultChar::Right("l".to_string()),
-			GuessResultChar::WrongPosition("i".to_string()),
-			GuessResultChar::Right("t".to_string()),
+			GuessResultToken::Right("p".to_string()),
+			GuessResultToken::WrongPosition("o".to_string()),
+			GuessResultToken::Right("l".to_string()),
+			GuessResultToken::WrongPosition("i".to_string()),
+			GuessResultToken::Right("t".to_string()),
 		];
 
-		let guesses: Vec<GuessResult> = vec![first_guess, second_guess];
+		let guesses = vec![first_guess, second_guess];
 		let (pattern, include, exclude) = get_match_args_from_results(&guesses);
 
 		assert_eq!(include, "pltoi".to_string());
@@ -245,11 +237,11 @@ mod tests {
 		assert_eq!(
 			pattern,
 			vec![
-				MatchOperation::MatchAnyIn("p".to_string()),
-				MatchOperation::ExcludeAllIn("lo".to_string()),
-				MatchOperation::MatchAnyIn("l".to_string()),
-				MatchOperation::ExcludeAllIn("ti".to_string()),
-				MatchOperation::MatchAnyIn("t".to_string()),
+				MatchPatternToken::MatchAnyIn("p".to_string()),
+				MatchPatternToken::ExcludeAllIn("lo".to_string()),
+				MatchPatternToken::MatchAnyIn("l".to_string()),
+				MatchPatternToken::ExcludeAllIn("ti".to_string()),
+				MatchPatternToken::MatchAnyIn("t".to_string()),
 			]
 		);
 
