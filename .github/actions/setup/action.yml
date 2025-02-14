@@ -1,0 +1,8 @@
+name: Setup
+description: Setup
+
+runs:
+  using: composite
+  steps:
+    - run: rustup toolchain install stable --profile minimal --no-self-update
+      shell: bash
