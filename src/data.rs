@@ -24,6 +24,7 @@ fn parse_words_json() -> Vec<String> {
 			"iijjkk".to_string(),
 			"jjkk".to_string(),
 			"kkll".to_string(),
+			"yenta".to_string(),
 		];
 	}
 
@@ -31,7 +32,7 @@ fn parse_words_json() -> Vec<String> {
 	let content =
 		std::str::from_utf8(dict.data.as_ref()).expect("could not convert dictionary to string");
 	let mut strings: Vec<String> = content
-		.split("\n")
+		.lines()
 		.filter_map(|line| {
 			let trimmed = line.trim();
 

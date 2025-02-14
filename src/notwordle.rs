@@ -45,7 +45,7 @@ impl NotWordle {
 		self.guess_results.push(guess_result.clone());
 
 		let (pattern, include, exclude) = get_match_args_from_results(&self.guess_results);
-		let matches = match_from_pattern(&pattern, &include, &exclude);
+		let matches = match_from_pattern(&pattern, &include, &exclude, "");
 
 		Ok((matches, guess_result))
 	}

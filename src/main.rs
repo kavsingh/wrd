@@ -37,13 +37,17 @@ enum Commands {
 		#[arg(short, long)]
 		pattern: String,
 
-		/// letters to always exclude
+		/// word must include all of these letters
+		#[arg(short, long, default_value_t = ("").to_string())]
+		include: String,
+
+		/// words must not include any of these letters
 		#[arg(short, long, default_value_t = ("").to_string())]
 		exclude: String,
 
-		/// letters to always include
+		/// words can only contain letters within this group
 		#[arg(short, long, default_value_t = ("").to_string())]
-		include: String,
+		within: String,
 	},
 
 	// see words left after guesses
@@ -82,8 +86,9 @@ fn main() {
 			pattern,
 			exclude,
 			include,
+			within,
 		}) => {
-			match_runner(pattern, include, exclude);
+			match_runner(pattern, include, exclude, within);
 		}
 		Some(Commands::Nw { guess_results }) => {
 			not_wordle_runner(guess_results);
@@ -92,9 +97,9 @@ fn main() {
 	}
 }
 
-fn match_runner(pattern: &str, include: &str, exclude: &str) {
+fn match_runner(pattern: &str, include: &str, exclude: &str, within: &str) {
 	let pattern = parse_pattern(pattern);
-	let result = match_from_pattern(&pattern, include, exclude);
+	let result = match_from_pattern(&pattern, include, exclude, within);
 
 	println!("{}", format_word_grid(&result));
 }

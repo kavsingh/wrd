@@ -43,7 +43,12 @@ pub fn parse_pattern(descriptor: &str) -> MatchPattern {
 		.collect()
 }
 
-pub fn match_from_pattern(pattern: &MatchPattern, include: &str, exclude: &str) -> Vec<String> {
+pub fn match_from_pattern(
+	pattern: &MatchPattern,
+	include: &str,
+	exclude: &str,
+	within: &str,
+) -> Vec<String> {
 	get_words()
 		.iter()
 		.filter(|word| {
@@ -51,10 +56,17 @@ pub fn match_from_pattern(pattern: &MatchPattern, include: &str, exclude: &str) 
 				return false;
 			}
 
+			// word can only contain letters within this group
+			if !within.is_empty() && word.chars().any(|c| !within.contains(c)) {
+				return false;
+			}
+
+			// word must include all of these letters
 			if !include.is_empty() && include.chars().any(|c| !word.contains(c)) {
 				return false;
 			}
 
+			// word must not include any of these letters
 			if !exclude.is_empty() && exclude.chars().any(|c| word.contains(c)) {
 				return false;
 			}
@@ -100,7 +112,7 @@ mod tests {
 		];
 
 		assert_eq!(
-			match_from_pattern(&pattern, "", ""),
+			match_from_pattern(&pattern, "", "", ""),
 			vec!["jjkk".to_string(), "kkll".to_string()]
 		);
 	}
@@ -117,8 +129,24 @@ mod tests {
 		];
 
 		assert_eq!(
-			match_from_pattern(&pattern, "", ""),
+			match_from_pattern(&pattern, "", "", ""),
 			vec!["aaabbb".to_string(), "bbbccc".to_string()]
+		);
+	}
+
+	#[test]
+	fn should_match_on_pattern_within_pool() {
+		let pattern = vec![
+			MatchOperation::MatchAny,
+			MatchOperation::MatchAny,
+			MatchOperation::MatchAny,
+			MatchOperation::MatchAny,
+			MatchOperation::MatchAny,
+		];
+
+		assert_eq!(
+			match_from_pattern(&pattern, "t", "", "ytanpem"),
+			vec!["yenta".to_string()]
 		);
 	}
 }
