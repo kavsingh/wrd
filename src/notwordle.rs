@@ -104,33 +104,18 @@ fn get_match_args_from_results(guess_results: &[GuessResult]) -> (MatchPattern, 
 
 	for result in guess_results {
 		for (i, result_char) in result.iter().enumerate() {
-			let resolved_op = match result_char {
-				GuessResultChar::Right(c) => {
+			match result_char {
+				GuessResultChar::Right(c) | GuessResultChar::WrongPosition(c) => {
 					include.push_str(c);
-					MatchOperation::MatchAnyIn(c.to_string())
-				}
-				GuessResultChar::WrongPosition(c) => {
-					include.push_str(c);
-
-					let candidate_op = MatchOperation::ExcludeAllIn(c.to_string());
-					let current_op = match_pattern.get(i);
-
-					match (&candidate_op, current_op) {
-						(
-							MatchOperation::ExcludeAllIn(a),
-							Some(MatchOperation::ExcludeAllIn(b)),
-						) => {
-							let mut joined = b.to_owned();
-
-							joined.push_str(&a.clone());
-							MatchOperation::ExcludeAllIn(unique_string(&joined))
-						}
-						_ => candidate_op,
-					}
 				}
 				GuessResultChar::Wrong(c) => {
 					exclude.push_str(c);
+				}
+			}
 
+			let resolved_op = match result_char {
+				GuessResultChar::Right(c) => MatchOperation::MatchAnyIn(c.to_string()),
+				GuessResultChar::WrongPosition(c) | GuessResultChar::Wrong(c) => {
 					let candidate_op = MatchOperation::ExcludeAllIn(c.to_string());
 					let current_op = match_pattern.get(i);
 
@@ -188,7 +173,7 @@ mod tests {
 
 	#[test]
 	fn should_error_on_incorrect_pattern() {
-		let result = match parse_result_pattern("p ?q -r s aa") {
+		let result = match parse_result_pattern("p ?q !r s aa") {
 			Ok(_) => panic!("should not pass"),
 			Err(message) => message,
 		};
@@ -198,7 +183,7 @@ mod tests {
 
 	#[test]
 	fn should_parse_guess_patterns() -> Result<(), String> {
-		let result = parse_result_pattern("p ?l -a t -e")?;
+		let result = parse_result_pattern("p ?l !a t !e")?;
 
 		assert_eq!(
 			result,
