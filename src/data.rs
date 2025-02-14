@@ -1,5 +1,4 @@
 use rust_embed::Embed;
-use serde_json::Value;
 use std::sync::OnceLock;
 
 #[derive(Embed)]
@@ -28,17 +27,20 @@ fn parse_words_json() -> Vec<String> {
 		];
 	}
 
-	let words = Assets::get("words.json").expect("could not get dictionary");
-	let words_string =
-		std::str::from_utf8(words.data.as_ref()).expect("could not convert dictionary to string");
-	let json = serde_json::from_str::<Value>(words_string).expect("invalid dictionary json");
-	let values = json
-		.as_array()
-		.expect("expected dictionary to be array of strings");
+	let dict = Assets::get("words.txt").expect("could not get dictionary");
+	let content =
+		std::str::from_utf8(dict.data.as_ref()).expect("could not convert dictionary to string");
+	let mut strings: Vec<String> = content
+		.split("\n")
+		.filter_map(|line| {
+			let trimmed = line.trim();
 
-	let mut strings: Vec<String> = values
-		.iter()
-		.filter_map(|val| val.as_str().map(|s| s.to_string()))
+			if trimmed.is_empty() {
+				None
+			} else {
+				Some(trimmed.to_string())
+			}
+		})
 		.collect();
 
 	strings.sort_unstable();
