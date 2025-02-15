@@ -1,12 +1,12 @@
 mod data;
-mod match_pattern;
+mod match_words;
 mod notwordle;
 mod util;
 
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 
-use crate::match_pattern::{match_words, tokenize_pattern};
+use crate::match_words::{match_words, tokenize_pattern};
 use crate::notwordle::{GuessResultToken, Notwordle};
 
 /// find those words
@@ -19,9 +19,9 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-	/// find matches from patterns
-	Mp {
-		/// match pattern
+	/// find word matches from patterns
+	Mw {
+		/// match words
 		/// character positions seperated by space
 		/// *: match anything in this position
 		/// any number of lowercase chars: match any of the chars in the string in this position
@@ -83,13 +83,13 @@ fn main() {
 	let cli = Cli::parse();
 
 	match &cli.command {
-		Some(Commands::Mp {
+		Some(Commands::Mw {
 			pattern,
 			exclude,
 			include,
 			within,
 		}) => {
-			match_runner(pattern, include, exclude, within);
+			match_words_runner(pattern, include, exclude, within);
 		}
 		Some(Commands::Nw { guess_results }) => {
 			notwordle_runner(guess_results);
@@ -98,7 +98,7 @@ fn main() {
 	}
 }
 
-fn match_runner(pattern: &str, include: &str, exclude: &str, within: &str) {
+fn match_words_runner(pattern: &str, include: &str, exclude: &str, within: &str) {
 	let tokens = tokenize_pattern(pattern);
 	let result = match_words(&tokens, include, exclude, within, None);
 

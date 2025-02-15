@@ -1,9 +1,9 @@
 use std::sync::OnceLock;
 
-use regex::Regex;
+use regex_lite::Regex;
 
 use crate::{
-	match_pattern::{match_words, MatchPatternToken},
+	match_words::{match_words, MatcherToken},
 	util::unique_string,
 };
 
@@ -33,7 +33,6 @@ impl PartialEq for GuessResultToken {
 }
 
 impl Notwordle {
-	// p ?q -r -s -t
 	pub fn register_guess_result(
 		&mut self,
 		result: &str,
@@ -83,20 +82,22 @@ fn tokenize_guess_result(input: &str) -> Result<Vec<GuessResultToken>, String> {
 	for entry in entries.iter() {
 		let captures = match regex.captures(entry) {
 			Some(cap) => cap,
-			None => return Err(format!("invalid pattern {}", entry)),
+			None => return Err(format!("invalid input {}", entry)),
 		};
 
 		let char = match captures.get(2) {
 			Some(c) => c.as_str(),
-			None => return Err(format!("no value in pattern {}", entry)),
+			None => return Err(format!("no values in input {}", entry)),
 		};
 
-		let op = captures.get(1).map(|m| m.as_str()).unwrap_or("");
+		let modifier = captures.get(1).map(|m| m.as_str()).unwrap_or("");
+		let char_string = char.to_string();
 
-		match op {
-			"!" => result.push(GuessResultToken::Wrong(char.to_string())),
-			"?" => result.push(GuessResultToken::WrongPosition(char.to_string())),
-			_ => result.push(GuessResultToken::Right(char.to_string())),
+		match modifier {
+			"" => result.push(GuessResultToken::Right(char_string)),
+			"!" => result.push(GuessResultToken::Wrong(char_string)),
+			"?" => result.push(GuessResultToken::WrongPosition(char_string)),
+			_ => return Err(format!("invalid modifier {}", modifier)),
 		}
 	}
 
@@ -105,10 +106,10 @@ fn tokenize_guess_result(input: &str) -> Result<Vec<GuessResultToken>, String> {
 
 fn get_match_args_from_results(
 	guess_results: &[Vec<GuessResultToken>],
-) -> (Vec<MatchPatternToken>, String, String) {
+) -> (Vec<MatcherToken>, String, String) {
 	let mut include = "".to_string();
 	let mut exclude = "".to_string();
-	let mut match_tokens: Vec<MatchPatternToken> = vec![];
+	let mut match_tokens: Vec<MatcherToken> = vec![];
 
 	for result in guess_results {
 		for (i, result_char) in result.iter().enumerate() {
@@ -122,20 +123,17 @@ fn get_match_args_from_results(
 			}
 
 			let resolved_op = match result_char {
-				GuessResultToken::Right(c) => MatchPatternToken::MatchAnyIn(c.to_string()),
+				GuessResultToken::Right(c) => MatcherToken::MatchAnyIn(c.to_string()),
 				GuessResultToken::WrongPosition(c) | GuessResultToken::Wrong(c) => {
-					let candidate_op = MatchPatternToken::ExcludeAllIn(c.to_string());
+					let candidate_op = MatcherToken::ExcludeAllIn(c.to_string());
 					let current_op = match_tokens.get(i);
 
 					match (&candidate_op, current_op) {
-						(
-							MatchPatternToken::ExcludeAllIn(a),
-							Some(MatchPatternToken::ExcludeAllIn(b)),
-						) => {
+						(MatcherToken::ExcludeAllIn(a), Some(MatcherToken::ExcludeAllIn(b))) => {
 							let mut joined = b.to_owned();
 
 							joined.push_str(&a.clone());
-							MatchPatternToken::ExcludeAllIn(unique_string(&joined))
+							MatcherToken::ExcludeAllIn(unique_string(&joined))
 						}
 						_ => candidate_op,
 					}
@@ -158,19 +156,17 @@ fn get_match_args_from_results(
 }
 
 #[cfg(test)]
-mod tests {
-	use crate::match_pattern::MatchPatternToken;
-
+mod tokenize_tests {
 	use super::*;
 
 	#[test]
-	fn should_error_on_incorrect_pattern() {
+	fn should_error_on_invalid_input() {
 		let result = match tokenize_guess_result("p ?q !r aa") {
 			Ok(_) => panic!("should not pass"),
 			Err(message) => message,
 		};
 
-		assert_eq!(result, "invalid pattern aa");
+		assert_eq!(result, "invalid input aa");
 	}
 
 	#[test]
@@ -190,9 +186,16 @@ mod tests {
 
 		Ok(())
 	}
+}
+
+#[cfg(test)]
+mod match_args_tests {
+	use crate::match_words::MatcherToken;
+
+	use super::*;
 
 	#[test]
-	fn should_build_matcher_pattern_from_guesses() -> Result<(), String> {
+	fn should_build_match_inputs_from_guesses() -> Result<(), String> {
 		// word is pilot
 
 		// plate
@@ -212,11 +215,11 @@ mod tests {
 		assert_eq!(
 			pattern,
 			vec![
-				MatchPatternToken::MatchAnyIn("p".to_string()),
-				MatchPatternToken::ExcludeAllIn("l".to_string()),
-				MatchPatternToken::ExcludeAllIn("a".to_string()),
-				MatchPatternToken::ExcludeAllIn("t".to_string()),
-				MatchPatternToken::ExcludeAllIn("e".to_string()),
+				MatcherToken::MatchAnyIn("p".to_string()),
+				MatcherToken::ExcludeAllIn("l".to_string()),
+				MatcherToken::ExcludeAllIn("a".to_string()),
+				MatcherToken::ExcludeAllIn("t".to_string()),
+				MatcherToken::ExcludeAllIn("e".to_string()),
 			]
 		);
 
@@ -237,11 +240,11 @@ mod tests {
 		assert_eq!(
 			pattern,
 			vec![
-				MatchPatternToken::MatchAnyIn("p".to_string()),
-				MatchPatternToken::ExcludeAllIn("lo".to_string()),
-				MatchPatternToken::MatchAnyIn("l".to_string()),
-				MatchPatternToken::ExcludeAllIn("ti".to_string()),
-				MatchPatternToken::MatchAnyIn("t".to_string()),
+				MatcherToken::MatchAnyIn("p".to_string()),
+				MatcherToken::ExcludeAllIn("lo".to_string()),
+				MatcherToken::MatchAnyIn("l".to_string()),
+				MatcherToken::ExcludeAllIn("ti".to_string()),
+				MatcherToken::MatchAnyIn("t".to_string()),
 			]
 		);
 
