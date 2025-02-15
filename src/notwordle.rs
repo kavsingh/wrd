@@ -37,7 +37,7 @@ impl Notwordle {
 	pub fn register_guess_result(
 		&mut self,
 		result: &str,
-	) -> Result<(Vec<String>, Vec<GuessResultToken>), String> {
+	) -> Result<(Vec<&str>, Vec<GuessResultToken>), String> {
 		let new_result = tokenize_guess_result(result)?;
 
 		if let Some(stored) = self.guess_results.last() {

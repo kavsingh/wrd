@@ -27,7 +27,7 @@ pub fn match_words_runner(
 pub fn notwordle_runner(guess_results: &str) -> Result<(), Box<dyn Error>> {
 	let mut notwordle = Notwordle::default();
 	let results: Vec<&str> = guess_results.split(",").collect();
-	let mut print_items: Vec<String> = vec![];
+	let mut print_items: Vec<&str> = vec![];
 
 	for result in results {
 		let (items, parsed_result) = notwordle.register_guess_result(result)?;
@@ -45,7 +45,7 @@ pub fn notwordle_runner(guess_results: &str) -> Result<(), Box<dyn Error>> {
 	Ok(())
 }
 
-fn format_word_grid(words: &[String]) -> String {
+fn format_word_grid(words: &[&str]) -> String {
 	words
 		.chunks(14)
 		.map(|c| {

@@ -1,4 +1,4 @@
-use crate::data::WORD_LIST;
+use crate::data::WORDS;
 
 #[derive(Clone, Debug)]
 pub enum MatcherToken {
@@ -18,15 +18,15 @@ impl PartialEq for MatcherToken {
 	}
 }
 
-pub fn match_words(
+pub fn match_words<'a>(
 	tokens: &[MatcherToken],
 	include: &str,
 	exclude: &str,
 	within: &str,
-	words: Option<&Vec<String>>,
-) -> Vec<String> {
+	words: Option<&[&'a str]>,
+) -> Vec<&'a str> {
 	words
-		.unwrap_or_else(|| &WORD_LIST)
+		.unwrap_or_else(|| &WORDS)
 		.iter()
 		.filter(|word| {
 			if word.len() != tokens.len() {
@@ -103,21 +103,10 @@ fn tokenize(input: &str) -> Result<MatcherToken, &'static str> {
 mod match_words_tests {
 	use super::*;
 
-	fn test_words() -> Vec<String> {
-		vec![
-			"aaabbb".to_string(),
-			"bbbccc".to_string(),
-			"cccddd".to_string(),
-			"dddeee".to_string(),
-			"eeefff".to_string(),
-			"fffggg".to_string(),
-			"gghhii".to_string(),
-			"iijjkk".to_string(),
-			"jjkk".to_string(),
-			"kkll".to_string(),
-			"yenta".to_string(),
-		]
-	}
+	static TEST_WORDS: [&str; 11] = [
+		"aaabbb", "bbbccc", "cccddd", "dddeee", "eeefff", "fffggg", "gghhii", "iijjkk", "jjkk",
+		"kkll", "yenta",
+	];
 
 	#[test]
 	fn should_constrain_to_tokens_length() {
@@ -129,7 +118,7 @@ mod match_words_tests {
 		];
 
 		assert_eq!(
-			match_words(&pattern, "", "", "", Some(&test_words())),
+			match_words(&pattern, "", "", "", Some(&TEST_WORDS)),
 			vec!["jjkk".to_string(), "kkll".to_string()]
 		);
 	}
@@ -146,7 +135,7 @@ mod match_words_tests {
 		];
 
 		assert_eq!(
-			match_words(&pattern, "", "", "", Some(&test_words())),
+			match_words(&pattern, "", "", "", Some(&TEST_WORDS)),
 			vec!["aaabbb".to_string(), "bbbccc".to_string()]
 		);
 	}
@@ -162,7 +151,7 @@ mod match_words_tests {
 		];
 
 		assert_eq!(
-			match_words(&pattern, "t", "", "ytanpem", Some(&test_words())),
+			match_words(&pattern, "t", "", "ytanpem", Some(&TEST_WORDS)),
 			vec!["yenta".to_string()]
 		);
 	}

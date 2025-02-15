@@ -7,7 +7,8 @@
 		"**/target": true
 	},
 	"search.exclude": {
-		"**/target": true
+		"**/target": true,
+		"**/data": true
 	},
 
 	"rust-analyzer.check.command": "clippy",
