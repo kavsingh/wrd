@@ -18,29 +18,6 @@ impl PartialEq for MatcherToken {
 	}
 }
 
-pub fn tokenize_pattern(input: &str) -> Vec<MatcherToken> {
-	input
-		.split(" ")
-		.map(|desc| {
-			if desc.contains("*") {
-				return MatcherToken::MatchAny;
-			}
-
-			let letters: String = desc.chars().filter(|c| c.is_ascii() && *c != '!').collect();
-
-			if letters.is_empty() {
-				panic!("empty or non-ascii descriptors not allowed")
-			}
-
-			if desc.starts_with("!") {
-				MatcherToken::ExcludeAllIn(letters)
-			} else {
-				MatcherToken::MatchAnyIn(letters)
-			}
-		})
-		.collect()
-}
-
 pub fn match_words(
 	tokens: &[MatcherToken],
 	include: &str,
@@ -92,6 +69,34 @@ pub fn match_words(
 		})
 		.cloned()
 		.collect()
+}
+
+pub fn tokenize_pattern(input: &str) -> Result<Vec<MatcherToken>, &'static str> {
+	input
+		.split(" ")
+		.map(|part| tokenize(part))
+		.collect::<Result<Vec<_>, _>>()
+}
+
+fn tokenize(input: &str) -> Result<MatcherToken, &'static str> {
+	if input.contains("*") {
+		return Ok(MatcherToken::MatchAny);
+	}
+
+	let letters: String = input
+		.chars()
+		.filter(|c| c.is_ascii() && *c != '!')
+		.collect();
+
+	if letters.is_empty() {
+		return Err("empty or non-ascii matchers not allowed");
+	}
+
+	if input.starts_with("!") {
+		Ok(MatcherToken::ExcludeAllIn(letters))
+	} else {
+		Ok(MatcherToken::MatchAnyIn(letters))
+	}
 }
 
 #[cfg(test)]

@@ -3,6 +3,9 @@ mod match_words;
 mod notwordle;
 mod util;
 
+use std::error::Error;
+use std::process;
+
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 
@@ -89,42 +92,57 @@ fn main() {
 			include,
 			within,
 		}) => {
-			match_words_runner(pattern, include, exclude, within);
+			if let Err(err) = match_words_runner(pattern, include, exclude, within) {
+				eprintln!("mw error: {err}");
+				process::exit(1);
+			}
 		}
 		Some(Commands::Nw { guess_results }) => {
-			notwordle_runner(guess_results);
+			if let Err(err) = notwordle_runner(guess_results) {
+				eprintln!("nw error: {err}");
+				process::exit(1);
+			}
 		}
-		None => panic!("expected a command"),
+		None => {
+			eprintln!("expected a command");
+			process::exit(1);
+		}
 	}
 }
 
-fn match_words_runner(pattern: &str, include: &str, exclude: &str, within: &str) {
-	let tokens = tokenize_pattern(pattern);
+fn match_words_runner(
+	pattern: &str,
+	include: &str,
+	exclude: &str,
+	within: &str,
+) -> Result<(), Box<dyn Error>> {
+	let tokens = tokenize_pattern(pattern)?;
 	let result = match_words(&tokens, include, exclude, within, None);
 
 	println!("{}", format_word_grid(&result));
+
+	Ok(())
 }
 
-fn notwordle_runner(guess_results: &str) {
+fn notwordle_runner(guess_results: &str) -> Result<(), Box<dyn Error>> {
 	let mut notwordle = Notwordle::default();
 	let results: Vec<&str> = guess_results.split(",").collect();
 	let mut print_items: Vec<String> = vec![];
 
 	for result in results {
-		match notwordle.register_guess_result(result) {
-			Ok((items, parsed_result)) => {
-				println!(
-					"{} remaining after {}",
-					items.len(),
-					format_notwordle_guess_result(&parsed_result)
-				);
-				print_items = items;
-			}
-			Err(e) => println!("Error: {}", e),
-		};
+		let (items, parsed_result) = notwordle.register_guess_result(result)?;
+
+		println!(
+			"{} remaining after {}",
+			items.len(),
+			format_notwordle_guess_result(&parsed_result)
+		);
+		print_items = items;
 	}
 
 	println!("{}", format_word_grid(&print_items));
+
+	Ok(())
 }
 
 fn format_word_grid(words: &[String]) -> String {
