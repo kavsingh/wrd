@@ -1,3 +1,7 @@
+use std::sync::LazyLock;
+
+use regex_lite::Regex;
+
 use crate::data::WORDS;
 
 #[derive(Clone, Debug)]
@@ -19,6 +23,19 @@ impl PartialEq for MatcherToken {
 }
 
 pub fn match_words<'a>(
+	pattern: &str,
+	include: &str,
+	exclude: &str,
+	within: &str,
+	words: Option<&[&'a str]>,
+) -> Result<Vec<&'a str>, String> {
+	let tokens = tokenize_pattern(pattern)?;
+	let result = match_words_from_tokens(&tokens, include, exclude, within, words);
+
+	Ok(result)
+}
+
+pub fn match_words_from_tokens<'a>(
 	tokens: &[MatcherToken],
 	include: &str,
 	exclude: &str,
@@ -28,74 +45,144 @@ pub fn match_words<'a>(
 	words
 		.unwrap_or_else(|| &WORDS)
 		.iter()
-		.filter(|word| {
-			if word.len() != tokens.len() {
-				return false;
-			}
-
-			// word can only contain letters within this group
-			if !within.is_empty() && word.chars().any(|c| !within.contains(c)) {
-				return false;
-			}
-
-			// word must include all of these letters
-			if !include.is_empty() && include.chars().any(|c| !word.contains(c)) {
-				return false;
-			}
-
-			// word must not include any of these letters
-			if !exclude.is_empty() && exclude.chars().any(|c| word.contains(c)) {
-				return false;
-			}
-
-			for (i, char) in word.chars().enumerate() {
-				match tokens.get(i) {
-					Some(MatcherToken::MatchAny) => continue,
-					Some(MatcherToken::MatchAnyIn(chars)) => {
-						if !chars.chars().any(|l| l == char) {
-							return false;
-						}
-					}
-					Some(MatcherToken::ExcludeAllIn(chars)) => {
-						if chars.chars().any(|l| l == char) {
-							return false;
-						}
-					}
-					None => continue,
-				}
-			}
-
-			true
-		})
+		.filter(|word| match_word(word, tokens, include, exclude, within))
 		.cloned()
 		.collect()
 }
 
-pub fn tokenize_pattern(input: &str) -> Result<Vec<MatcherToken>, &'static str> {
+fn match_word(
+	word: &str,
+	tokens: &[MatcherToken],
+	include: &str,
+	exclude: &str,
+	within: &str,
+) -> bool {
+	if word.len() != tokens.len() {
+		return false;
+	}
+
+	// word can only contain letters within this group
+	if !within.is_empty() && word.chars().any(|c| !within.contains(c)) {
+		return false;
+	}
+
+	// word must include all of these letters
+	if !include.is_empty() && include.chars().any(|c| !word.contains(c)) {
+		return false;
+	}
+
+	// word must not include any of these letters
+	if !exclude.is_empty() && exclude.chars().any(|c| word.contains(c)) {
+		return false;
+	}
+
+	for (i, char) in word.chars().enumerate() {
+		match tokens.get(i) {
+			Some(MatcherToken::MatchAny) => continue,
+			Some(MatcherToken::MatchAnyIn(chars)) => {
+				if !chars.chars().any(|l| l == char) {
+					return false;
+				}
+			}
+			Some(MatcherToken::ExcludeAllIn(chars)) => {
+				if chars.chars().any(|l| l == char) {
+					return false;
+				}
+			}
+			None => continue,
+		}
+	}
+
+	true
+}
+
+fn tokenize_pattern(input: &str) -> Result<Vec<MatcherToken>, String> {
 	input
 		.split(" ")
-		.map(|part| tokenize(part))
+		.map(tokenize)
 		.collect::<Result<Vec<_>, _>>()
 }
 
-fn tokenize(input: &str) -> Result<MatcherToken, &'static str> {
-	if input.contains("*") {
+static MATCH_TOKEN_REGEX: LazyLock<Regex> =
+	LazyLock::new(|| Regex::new(r"^(\!)?([a-z]+)$").expect("invalid match token regex"));
+
+fn tokenize(input: &str) -> Result<MatcherToken, String> {
+	if input == "*" {
 		return Ok(MatcherToken::MatchAny);
 	}
 
-	let letters: String = input
-		.chars()
-		.filter(|c| c.is_ascii() && *c != '!')
-		.collect();
+	let regex = &MATCH_TOKEN_REGEX;
+	let captures = match regex.captures(input) {
+		Some(c) => c,
+		None => return Err(format!("invalid input {input}")),
+	};
 
-	if letters.is_empty() {
-		return Err("empty or non-ascii matchers not allowed");
+	match (
+		captures.get(1).map(|c| c.as_str()),
+		captures.get(2).map(|c| c.as_str()),
+	) {
+		(Some("!"), Some(letters)) => Ok(MatcherToken::ExcludeAllIn(letters.to_owned())),
+		(None, Some(letters)) => Ok(MatcherToken::MatchAnyIn(letters.to_owned())),
+		_ => Err(format!("invalid input {input}")),
+	}
+}
+
+#[cfg(test)]
+mod tokenize_tests {
+	use super::*;
+
+	#[test]
+	fn should_error_on_invalid_pattern() {
+		let message = match tokenize_pattern("* abc !def ghi!de") {
+			Ok(_) => panic!("should not pass"),
+			Err(e) => e,
+		};
+
+		assert_eq!(message, "invalid input ghi!de");
+
+		let message = match tokenize_pattern(" a") {
+			Ok(_) => panic!("should not pass"),
+			Err(e) => e,
+		};
+
+		assert_eq!(message, "invalid input ");
+
+		let message = match tokenize_pattern("45 ") {
+			Ok(_) => panic!("should not pass"),
+			Err(e) => e,
+		};
+
+		assert_eq!(message, "invalid input 45");
+
+		let message = match tokenize_pattern("** ABC !def") {
+			Ok(_) => panic!("should not pass"),
+			Err(e) => e,
+		};
+
+		assert_eq!(message, "invalid input **");
+
+		let message = match tokenize_pattern("ABC !def") {
+			Ok(_) => panic!("should not pass"),
+			Err(e) => e,
+		};
+
+		assert_eq!(message, "invalid input ABC");
 	}
 
-	if input.starts_with("!") {
-		Ok(MatcherToken::ExcludeAllIn(letters))
-	} else {
-		Ok(MatcherToken::MatchAnyIn(letters))
+	#[test]
+	fn should_tokenize_pattern() -> Result<(), String> {
+		assert_eq!(
+			tokenize_pattern("* a !bcd ef *")?,
+			vec![
+				MatcherToken::MatchAny,
+				MatcherToken::MatchAnyIn("a".to_string()),
+				MatcherToken::ExcludeAllIn("bcd".to_string()),
+				MatcherToken::MatchAnyIn("ef".to_string()),
+				MatcherToken::MatchAny,
+			]
+		);
+
+		Ok(())
 	}
 }
 
@@ -110,7 +197,7 @@ mod match_words_tests {
 
 	#[test]
 	fn should_constrain_to_tokens_length() {
-		let pattern = vec![
+		let tokens = vec![
 			MatcherToken::MatchAny,
 			MatcherToken::MatchAny,
 			MatcherToken::MatchAny,
@@ -118,14 +205,14 @@ mod match_words_tests {
 		];
 
 		assert_eq!(
-			match_words(&pattern, "", "", "", Some(&TEST_WORDS)),
+			match_words_from_tokens(&tokens, "", "", "", Some(&TEST_WORDS)),
 			vec!["jjkk".to_string(), "kkll".to_string()]
 		);
 	}
 
 	#[test]
 	fn should_match_on_tokens() {
-		let pattern = vec![
+		let tokens = vec![
 			MatcherToken::MatchAny,
 			MatcherToken::MatchAnyIn("ab".to_string()),
 			MatcherToken::ExcludeAllIn("cd".to_string()),
@@ -135,14 +222,14 @@ mod match_words_tests {
 		];
 
 		assert_eq!(
-			match_words(&pattern, "", "", "", Some(&TEST_WORDS)),
+			match_words_from_tokens(&tokens, "", "", "", Some(&TEST_WORDS)),
 			vec!["aaabbb".to_string(), "bbbccc".to_string()]
 		);
 	}
 
 	#[test]
 	fn should_match_on_tokens_within_pool() {
-		let pattern = vec![
+		let tokens = vec![
 			MatcherToken::MatchAny,
 			MatcherToken::MatchAny,
 			MatcherToken::MatchAny,
@@ -151,7 +238,7 @@ mod match_words_tests {
 		];
 
 		assert_eq!(
-			match_words(&pattern, "t", "", "ytanpem", Some(&TEST_WORDS)),
+			match_words_from_tokens(&tokens, "t", "", "ytanpem", Some(&TEST_WORDS)),
 			vec!["yenta".to_string()]
 		);
 	}

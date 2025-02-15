@@ -3,12 +3,9 @@ use std::sync::LazyLock;
 use regex_lite::Regex;
 
 use crate::{
-	match_words::{match_words, MatcherToken},
+	match_words::{match_words_from_tokens, MatcherToken},
 	util::unique_string,
 };
-
-static GUESS_TOKEN_REGEX: LazyLock<Regex> =
-	LazyLock::new(|| Regex::new(r"^([!?]{1})?([a-z]{1})$").expect("invalid guess regex"));
 
 #[derive(Default)]
 pub struct Notwordle {
@@ -55,11 +52,14 @@ impl Notwordle {
 		self.guess_results.push(new_result.clone());
 
 		let (tokens, include, exclude) = get_match_args_from_results(&self.guess_results);
-		let matches = match_words(&tokens, &include, &exclude, "", None);
+		let matches = match_words_from_tokens(&tokens, &include, &exclude, "", None);
 
 		Ok((matches, new_result))
 	}
 }
+
+static GUESS_TOKEN_REGEX: LazyLock<Regex> =
+	LazyLock::new(|| Regex::new(r"^([!?]{1})?([a-z]{1})$").expect("invalid guess regex"));
 
 fn tokenize_guess_result(input: &str) -> Result<Vec<GuessResultToken>, String> {
 	let entries: Vec<&str> = input

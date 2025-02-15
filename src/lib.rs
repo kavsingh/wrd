@@ -7,7 +7,7 @@ use std::error::Error;
 
 use colored::Colorize;
 
-use crate::match_words::{match_words, tokenize_pattern};
+use crate::match_words::match_words;
 use crate::notwordle::{GuessResultToken, Notwordle};
 
 pub fn match_words_runner(
@@ -16,8 +16,7 @@ pub fn match_words_runner(
 	exclude: &str,
 	within: &str,
 ) -> Result<(), Box<dyn Error>> {
-	let tokens = tokenize_pattern(pattern)?;
-	let result = match_words(&tokens, include, exclude, within, None);
+	let result = match_words(pattern, include, exclude, within, None)?;
 
 	println!("{}", format_word_grid(&result));
 
