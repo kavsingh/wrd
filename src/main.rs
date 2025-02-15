@@ -1,18 +1,9 @@
-mod data;
-mod match_words;
-mod notwordle;
-mod util;
-
-use std::error::Error;
 use std::process;
 
 use clap::{Parser, Subcommand};
-use colored::Colorize;
 
-use crate::match_words::{match_words, tokenize_pattern};
-use crate::notwordle::{GuessResultToken, Notwordle};
+use wrd::{match_words_runner, notwordle_runner};
 
-/// find those words
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Cli {
@@ -108,61 +99,4 @@ fn main() {
 			process::exit(1);
 		}
 	}
-}
-
-fn match_words_runner(
-	pattern: &str,
-	include: &str,
-	exclude: &str,
-	within: &str,
-) -> Result<(), Box<dyn Error>> {
-	let tokens = tokenize_pattern(pattern)?;
-	let result = match_words(&tokens, include, exclude, within, None);
-
-	println!("{}", format_word_grid(&result));
-
-	Ok(())
-}
-
-fn notwordle_runner(guess_results: &str) -> Result<(), Box<dyn Error>> {
-	let mut notwordle = Notwordle::default();
-	let results: Vec<&str> = guess_results.split(",").collect();
-	let mut print_items: Vec<String> = vec![];
-
-	for result in results {
-		let (items, parsed_result) = notwordle.register_guess_result(result)?;
-
-		println!(
-			"{} remaining after {}",
-			items.len(),
-			format_notwordle_guess_result(&parsed_result)
-		);
-		print_items = items;
-	}
-
-	println!("{}", format_word_grid(&print_items));
-
-	Ok(())
-}
-
-fn format_word_grid(words: &[String]) -> String {
-	words
-		.chunks(14)
-		.map(|c| {
-			c.iter()
-				.fold("".to_string(), |s, c| format!("{}\t{}", s, c.dimmed()))
-		})
-		.collect::<Vec<_>>()
-		.join("\n")
-}
-
-fn format_notwordle_guess_result(result: &[GuessResultToken]) -> String {
-	result
-		.iter()
-		.map(|result_char| match result_char {
-			GuessResultToken::Right(c) => c.bright_yellow().underline(),
-			GuessResultToken::WrongPosition(c) => c.blue(),
-			GuessResultToken::Wrong(c) => c.dimmed(),
-		})
-		.fold("".to_string(), |s, c| format!("{}{}", s, c))
 }
