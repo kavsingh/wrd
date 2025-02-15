@@ -1,4 +1,4 @@
-use crate::data::get_words;
+use crate::data::WORD_LIST;
 
 #[derive(Clone, Debug)]
 pub enum MatcherToken {
@@ -49,7 +49,7 @@ pub fn match_words(
 	words: Option<&Vec<String>>,
 ) -> Vec<String> {
 	words
-		.unwrap_or_else(|| get_words())
+		.unwrap_or_else(|| &WORD_LIST)
 		.iter()
 		.filter(|word| {
 			if word.len() != tokens.len() {

@@ -1,4 +1,4 @@
-use std::sync::OnceLock;
+use std::sync::LazyLock;
 
 use regex_lite::Regex;
 
@@ -7,7 +7,8 @@ use crate::{
 	util::unique_string,
 };
 
-static GUESS_PART_REGEX: OnceLock<Regex> = OnceLock::new();
+static GUESS_TOKEN_REGEX: LazyLock<Regex> =
+	LazyLock::new(|| Regex::new(r"^([!?]{1})?([a-z]{1})$").expect("invalid guess regex"));
 
 #[derive(Default)]
 pub struct Notwordle {
@@ -61,9 +62,6 @@ impl Notwordle {
 }
 
 fn tokenize_guess_result(input: &str) -> Result<Vec<GuessResultToken>, String> {
-	let regex = GUESS_PART_REGEX
-		.get_or_init(|| Regex::new(r"^([!?]{1})?([a-z]{1})$").expect("invalid guess regex"));
-
 	let entries: Vec<&str> = input
 		.split(" ")
 		.filter_map(|p| {
@@ -77,6 +75,7 @@ fn tokenize_guess_result(input: &str) -> Result<Vec<GuessResultToken>, String> {
 		})
 		.collect();
 
+	let regex = &GUESS_TOKEN_REGEX;
 	let mut result: Vec<GuessResultToken> = vec![];
 
 	for entry in entries.iter() {
