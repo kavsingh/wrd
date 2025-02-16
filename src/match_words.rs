@@ -25,7 +25,7 @@ impl PartialEq for MatchCharsToken {
 #[derive(Clone, Debug)]
 pub enum MatcherToken {
 	MatchAnyWord,
-	MatchOnChars(Vec<MatchCharsToken>),
+	MatchOnChars((Vec<MatchCharsToken>, Option<usize>)),
 }
 
 impl PartialEq for MatcherToken {
@@ -90,16 +90,27 @@ fn match_word(
 
 	match token {
 		MatcherToken::MatchAnyWord => true,
-		MatcherToken::MatchOnChars(tokens) => match_word_chars(word, tokens),
+		MatcherToken::MatchOnChars((tokens, end)) => match_word_chars(word, tokens, end),
 	}
 }
 
-fn match_word_chars(word: &str, tokens: &[MatchCharsToken]) -> bool {
-	if word.len() != tokens.len() {
+fn match_word_chars(word: &str, tokens: &[MatchCharsToken], end: &Option<usize>) -> bool {
+	let matchable = match end {
+		Some(index) => {
+			if *index < word.len() {
+				&word[..*index]
+			} else {
+				""
+			}
+		}
+		None => word,
+	};
+
+	if matchable.len() != tokens.len() {
 		return false;
 	}
 
-	for (i, char) in word.chars().enumerate() {
+	for (i, char) in matchable.chars().enumerate() {
 		match tokens.get(i) {
 			None | Some(MatchCharsToken::MatchAnyChar) => continue,
 			Some(MatchCharsToken::MatchAnyCharIn(chars)) => {
@@ -123,12 +134,38 @@ fn tokenize_pattern(input: &str) -> Result<MatcherToken, String> {
 		return Ok(MatcherToken::MatchAnyWord);
 	}
 
-	let chars_tokens = input
+	let parts = input
 		.split(" ")
-		.map(tokenize)
+		.filter_map(|line| {
+			let trimmed = line.trim();
+
+			if trimmed.is_empty() {
+				None
+			} else {
+				Some(trimmed)
+			}
+		})
+		.collect::<Vec<_>>();
+
+	if parts.is_empty() {
+		return Err("invalid empty input".to_string());
+	}
+
+	let end = match parts.last() {
+		Some(&"**") => Some(parts.len() - 1),
+		None | Some(_) => None,
+	};
+	let tokenizable = match end {
+		Some(num) => &parts[..num],
+		None => &parts[..],
+	};
+
+	let chars_tokens = tokenizable
+		.iter()
+		.map(|part| tokenize(part))
 		.collect::<Result<Vec<_>, _>>()?;
 
-	Ok(MatcherToken::MatchOnChars(chars_tokens))
+	Ok(MatcherToken::MatchOnChars((chars_tokens, end)))
 }
 
 static MATCH_CHARS_TOKEN_REGEX: LazyLock<Regex> =
@@ -165,7 +202,14 @@ mod tokenize_tests {
 			Err(e) => e,
 		};
 
-		assert_eq!(message, "invalid input ");
+		assert_eq!(message, "invalid empty input");
+
+		let message = match tokenize_pattern("** y") {
+			Ok(_) => panic!("should not pass"),
+			Err(e) => e,
+		};
+
+		assert_eq!(message, "invalid input **");
 
 		let message = match tokenize_pattern("* abc !def ghi!de") {
 			Ok(_) => panic!("should not pass"),
@@ -173,13 +217,6 @@ mod tokenize_tests {
 		};
 
 		assert_eq!(message, "invalid input ghi!de");
-
-		let message = match tokenize_pattern(" a") {
-			Ok(_) => panic!("should not pass"),
-			Err(e) => e,
-		};
-
-		assert_eq!(message, "invalid input ");
 
 		let message = match tokenize_pattern("45 ") {
 			Ok(_) => panic!("should not pass"),
@@ -216,18 +253,32 @@ mod tokenize_tests {
 
 		assert_eq!(
 			tokenize_pattern("*")?,
-			MatcherToken::MatchOnChars(vec![MatchCharsToken::MatchAnyChar])
+			MatcherToken::MatchOnChars((vec![MatchCharsToken::MatchAnyChar], None))
 		);
 
 		assert_eq!(
 			tokenize_pattern("* a !bcd ef *")?,
-			MatcherToken::MatchOnChars(vec![
-				MatchCharsToken::MatchAnyChar,
-				MatchCharsToken::MatchAnyCharIn("a".to_string()),
-				MatchCharsToken::ExcludeAllCharsIn("bcd".to_string()),
-				MatchCharsToken::MatchAnyCharIn("ef".to_string()),
-				MatchCharsToken::MatchAnyChar,
-			])
+			MatcherToken::MatchOnChars((
+				vec![
+					MatchCharsToken::MatchAnyChar,
+					MatchCharsToken::MatchAnyCharIn("a".to_string()),
+					MatchCharsToken::ExcludeAllCharsIn("bcd".to_string()),
+					MatchCharsToken::MatchAnyCharIn("ef".to_string()),
+					MatchCharsToken::MatchAnyChar,
+				],
+				None
+			))
+		);
+
+		assert_eq!(
+			tokenize_pattern("y e **")?,
+			MatcherToken::MatchOnChars((
+				vec![
+					MatchCharsToken::MatchAnyCharIn("y".to_string()),
+					MatchCharsToken::MatchAnyCharIn("e".to_string()),
+				],
+				Some(2)
+			))
 		);
 
 		Ok(())
@@ -238,9 +289,9 @@ mod tokenize_tests {
 mod match_words_tests {
 	use super::*;
 
-	static TEST_WORDS: [&str; 11] = [
+	static TEST_WORDS: [&str; 12] = [
 		"aaabbb", "bbbccc", "cccddd", "dddeee", "eeefff", "fffggg", "gghhii", "iijjkk", "jjkk",
-		"kkll", "yenta",
+		"kkll", "yenta", "yes",
 	];
 
 	#[test]
@@ -270,12 +321,15 @@ mod match_words_tests {
 
 	#[test]
 	fn should_constrain_chars_match_to_tokens_length() {
-		let token = MatcherToken::MatchOnChars(vec![
-			MatchCharsToken::MatchAnyChar,
-			MatchCharsToken::MatchAnyChar,
-			MatchCharsToken::MatchAnyChar,
-			MatchCharsToken::MatchAnyChar,
-		]);
+		let token = MatcherToken::MatchOnChars((
+			vec![
+				MatchCharsToken::MatchAnyChar,
+				MatchCharsToken::MatchAnyChar,
+				MatchCharsToken::MatchAnyChar,
+				MatchCharsToken::MatchAnyChar,
+			],
+			None,
+		));
 
 		assert_eq!(
 			match_words_from_tokenized(&token, "", "", "", Some(&TEST_WORDS)),
@@ -285,30 +339,64 @@ mod match_words_tests {
 
 	#[test]
 	fn should_match_chars_on_tokens() {
-		let token = MatcherToken::MatchOnChars(vec![
-			MatchCharsToken::MatchAnyChar,
-			MatchCharsToken::MatchAnyCharIn("ab".to_string()),
-			MatchCharsToken::ExcludeAllCharsIn("cd".to_string()),
-			MatchCharsToken::MatchAnyChar,
-			MatchCharsToken::MatchAnyChar,
-			MatchCharsToken::MatchAnyChar,
-		]);
+		let token = MatcherToken::MatchOnChars((
+			vec![
+				MatchCharsToken::MatchAnyChar,
+				MatchCharsToken::MatchAnyCharIn("ab".to_string()),
+				MatchCharsToken::ExcludeAllCharsIn("cd".to_string()),
+				MatchCharsToken::MatchAnyChar,
+				MatchCharsToken::MatchAnyChar,
+				MatchCharsToken::MatchAnyChar,
+			],
+			None,
+		));
 
 		assert_eq!(
 			match_words_from_tokenized(&token, "", "", "", Some(&TEST_WORDS)),
 			vec!["aaabbb".to_string(), "bbbccc".to_string()]
 		);
+
+		let token = MatcherToken::MatchOnChars((
+			vec![
+				MatchCharsToken::MatchAnyCharIn("y".to_string()),
+				MatchCharsToken::MatchAnyCharIn("e".to_string()),
+			],
+			Some(2),
+		));
+
+		assert_eq!(
+			match_words_from_tokenized(&token, "", "", "", Some(&TEST_WORDS)),
+			vec!["yenta".to_string(), "yes".to_string()]
+		);
+
+		let token = MatcherToken::MatchOnChars((
+			vec![
+				MatchCharsToken::MatchAnyCharIn("f".to_string()),
+				MatchCharsToken::MatchAnyCharIn("f".to_string()),
+				MatchCharsToken::MatchAnyCharIn("f".to_string()),
+				MatchCharsToken::MatchAnyCharIn("g".to_string()),
+			],
+			Some(4),
+		));
+
+		assert_eq!(
+			match_words_from_tokenized(&token, "", "", "", Some(&TEST_WORDS)),
+			vec!["fffggg".to_string()]
+		);
 	}
 
 	#[test]
 	fn should_match_chars_on_tokens_within_globals() {
-		let tokens = MatcherToken::MatchOnChars(vec![
-			MatchCharsToken::MatchAnyChar,
-			MatchCharsToken::MatchAnyChar,
-			MatchCharsToken::MatchAnyChar,
-			MatchCharsToken::MatchAnyChar,
-			MatchCharsToken::MatchAnyChar,
-		]);
+		let tokens = MatcherToken::MatchOnChars((
+			vec![
+				MatchCharsToken::MatchAnyChar,
+				MatchCharsToken::MatchAnyChar,
+				MatchCharsToken::MatchAnyChar,
+				MatchCharsToken::MatchAnyChar,
+				MatchCharsToken::MatchAnyChar,
+			],
+			None,
+		));
 
 		assert_eq!(
 			match_words_from_tokenized(&tokens, "t", "", "ytanpem", Some(&TEST_WORDS)),

@@ -151,7 +151,7 @@ fn get_match_args_from_results(
 	}
 
 	(
-		MatcherToken::MatchOnChars(match_tokens),
+		MatcherToken::MatchOnChars((match_tokens, None)),
 		unique_string(&include),
 		unique_string(&exclude),
 	)
@@ -216,13 +216,16 @@ mod match_args_tests {
 		assert_eq!(exclude, "ae".to_string());
 		assert_eq!(
 			pattern,
-			MatcherToken::MatchOnChars(vec![
-				MatchCharsToken::MatchAnyCharIn("p".to_string()),
-				MatchCharsToken::ExcludeAllCharsIn("l".to_string()),
-				MatchCharsToken::ExcludeAllCharsIn("a".to_string()),
-				MatchCharsToken::ExcludeAllCharsIn("t".to_string()),
-				MatchCharsToken::ExcludeAllCharsIn("e".to_string()),
-			])
+			MatcherToken::MatchOnChars((
+				vec![
+					MatchCharsToken::MatchAnyCharIn("p".to_string()),
+					MatchCharsToken::ExcludeAllCharsIn("l".to_string()),
+					MatchCharsToken::ExcludeAllCharsIn("a".to_string()),
+					MatchCharsToken::ExcludeAllCharsIn("t".to_string()),
+					MatchCharsToken::ExcludeAllCharsIn("e".to_string()),
+				],
+				None
+			))
 		);
 
 		// polit (whatever)
@@ -241,13 +244,16 @@ mod match_args_tests {
 		assert_eq!(exclude, "ae".to_string());
 		assert_eq!(
 			pattern,
-			MatcherToken::MatchOnChars(vec![
-				MatchCharsToken::MatchAnyCharIn("p".to_string()),
-				MatchCharsToken::ExcludeAllCharsIn("lo".to_string()),
-				MatchCharsToken::MatchAnyCharIn("l".to_string()),
-				MatchCharsToken::ExcludeAllCharsIn("ti".to_string()),
-				MatchCharsToken::MatchAnyCharIn("t".to_string()),
-			])
+			MatcherToken::MatchOnChars((
+				vec![
+					MatchCharsToken::MatchAnyCharIn("p".to_string()),
+					MatchCharsToken::ExcludeAllCharsIn("lo".to_string()),
+					MatchCharsToken::MatchAnyCharIn("l".to_string()),
+					MatchCharsToken::ExcludeAllCharsIn("ti".to_string()),
+					MatchCharsToken::MatchAnyCharIn("t".to_string()),
+				],
+				None
+			))
 		);
 
 		Ok(())
