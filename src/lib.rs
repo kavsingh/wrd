@@ -49,7 +49,7 @@ fn format_word_grid(words: &[&str]) -> String {
 		.chunks(14)
 		.map(|c| {
 			c.iter()
-				.fold("".to_string(), |s, c| format!("{}\t{}", s, c.dimmed()))
+				.fold("".to_string(), |s, c| format!("{s}\t{}", c.dimmed()))
 		})
 		.collect::<Vec<_>>()
 		.join("\n")
@@ -63,5 +63,5 @@ fn format_notwordle_guess_result(result: &[GuessResultToken]) -> String {
 			GuessResultToken::WrongPosition(c) => c.blue(),
 			GuessResultToken::Wrong(c) => c.dimmed(),
 		})
-		.fold("".to_string(), |s, c| format!("{}{}", s, c))
+		.fold("".to_string(), |s, c| format!("{s}{c}"))
 }

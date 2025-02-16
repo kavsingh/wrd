@@ -7,7 +7,7 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 
-use crate::data::WORDS;
+use crate::{data::WORDS, util::non_empty_str};
 
 #[derive(Clone, Debug)]
 pub enum MatcherToken {
@@ -101,18 +101,7 @@ fn regex_from_tokens(tokens: &[MatcherToken]) -> Result<Regex, String> {
 }
 
 fn tokenize_pattern(input: &str) -> Result<Vec<MatcherToken>, String> {
-	let parts = input
-		.split(" ")
-		.filter_map(|line| {
-			let trimmed = line.trim();
-
-			if trimmed.is_empty() {
-				None
-			} else {
-				Some(trimmed)
-			}
-		})
-		.collect::<Vec<_>>();
+	let parts: Vec<_> = input.split(" ").filter_map(non_empty_str).collect();
 
 	if parts.is_empty() {
 		return Err("invalid empty input".to_string());

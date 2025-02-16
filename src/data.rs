@@ -2,6 +2,8 @@ use std::{borrow::Cow, str, sync::LazyLock};
 
 use rust_embed::Embed;
 
+use crate::util::non_empty_str;
+
 #[derive(Embed)]
 #[folder = "data"]
 struct Assets;
@@ -21,14 +23,6 @@ fn parse_word_list() -> Vec<&'static str> {
 	str::from_utf8(&WORD_DATA)
 		.expect("could not read word list")
 		.lines()
-		.filter_map(|line| {
-			let trimmed = line.trim();
-
-			if trimmed.is_empty() {
-				None
-			} else {
-				Some(trimmed)
-			}
-		})
+		.filter_map(non_empty_str)
 		.collect()
 }

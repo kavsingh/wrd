@@ -8,6 +8,16 @@ pub fn unique_string(str: &str) -> String {
 	})
 }
 
+pub fn non_empty_str(str: &str) -> Option<&str> {
+	let trimmed = str.trim();
+
+	if trimmed.is_empty() {
+		None
+	} else {
+		Some(trimmed)
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;

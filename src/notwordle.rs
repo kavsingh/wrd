@@ -4,7 +4,7 @@ use regex::Regex;
 
 use crate::{
 	match_words::{match_words_from_tokenized, MatcherToken},
-	util::unique_string,
+	util::{non_empty_str, unique_string},
 };
 
 #[derive(Default)]
@@ -43,8 +43,7 @@ impl Notwordle {
 
 			if stored_len != new_len {
 				return Err(format!(
-					"previous had {} items, got {} items",
-					stored_len, new_len
+					"previous had {stored_len} items, got {new_len} items"
 				));
 			}
 		}
@@ -62,41 +61,24 @@ static GUESS_TOKEN_REGEX: LazyLock<Regex> =
 	LazyLock::new(|| Regex::new(r"^([!?]{1})?([a-z]{1})$").expect("invalid guess regex"));
 
 fn tokenize_guess_result(input: &str) -> Result<Vec<GuessResultToken>, String> {
-	let entries: Vec<&str> = input
-		.split(" ")
-		.filter_map(|p| {
-			let trimmed = p.trim();
-
-			if trimmed.is_empty() {
-				None
-			} else {
-				Some(trimmed)
-			}
-		})
-		.collect();
-
-	let regex = &GUESS_TOKEN_REGEX;
+	let entries: Vec<_> = input.split(" ").filter_map(non_empty_str).collect();
 	let mut result: Vec<GuessResultToken> = vec![];
 
 	for entry in entries.iter() {
-		let captures = match regex.captures(entry) {
+		let captures = match GUESS_TOKEN_REGEX.captures(entry) {
 			Some(cap) => cap,
-			None => return Err(format!("invalid input {}", entry)),
+			None => return Err(format!("invalid input {entry}")),
 		};
 
-		let char = match captures.get(2) {
-			Some(c) => c.as_str(),
-			None => return Err(format!("no values in input {}", entry)),
-		};
-
-		let modifier = captures.get(1).map(|m| m.as_str()).unwrap_or("");
-		let char_string = char.to_string();
-
-		match modifier {
-			"" => result.push(GuessResultToken::Right(char_string)),
-			"!" => result.push(GuessResultToken::Wrong(char_string)),
-			"?" => result.push(GuessResultToken::WrongPosition(char_string)),
-			_ => return Err(format!("invalid modifier {}", modifier)),
+		match (
+			captures.get(1).map(|c| c.as_str()),
+			captures.get(2).map(|c| c.as_str().to_owned()),
+		) {
+			(_, None) => return Err(format!("no values in input {entry}")),
+			(None, Some(c)) => result.push(GuessResultToken::Right(c)),
+			(Some("!"), Some(c)) => result.push(GuessResultToken::Wrong(c)),
+			(Some("?"), Some(c)) => result.push(GuessResultToken::WrongPosition(c)),
+			_ => return Err(format!("invalid input {entry}")),
 		}
 	}
 
