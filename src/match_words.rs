@@ -41,12 +41,12 @@ pub fn match_words<'a>(
 	words: Option<&[&'a str]>,
 ) -> Result<Vec<&'a str>, String> {
 	let tokens = tokenize_pattern(pattern)?;
-	let result = match_words_from_tokenized(&tokens, include, exclude, within, words)?;
+	let result = match_words_from_tokens(&tokens, include, exclude, within, words)?;
 
 	Ok(result)
 }
 
-pub fn match_words_from_tokenized<'a>(
+pub fn match_words_from_tokens<'a>(
 	tokens: &[MatcherToken],
 	include: &str,
 	exclude: &str,
@@ -94,8 +94,6 @@ fn regex_from_tokens(tokens: &[MatcherToken]) -> Result<Regex, String> {
 		})
 		.collect::<String>();
 	let bounded = format!("^{pattern}$");
-
-	dbg!(&bounded);
 
 	Regex::new(&bounded).map_err(|err| format!("invalid regex {pattern}: {err}"))
 }
@@ -235,7 +233,7 @@ mod match_words_tests {
 		let tokens = vec![MatcherToken::MatchAnyChars];
 
 		assert_eq!(
-			match_words_from_tokenized(&tokens, "", "", "", Some(&TEST_WORDS))?,
+			match_words_from_tokens(&tokens, "", "", "", Some(&TEST_WORDS))?,
 			&TEST_WORDS
 		);
 
@@ -247,12 +245,12 @@ mod match_words_tests {
 		let tokens = vec![MatcherToken::MatchAnyChars];
 
 		assert_eq!(
-			match_words_from_tokenized(&tokens, "", "", "gfjk", Some(&TEST_WORDS))?,
+			match_words_from_tokens(&tokens, "", "", "gfjk", Some(&TEST_WORDS))?,
 			vec!["fffggg", "jjkk"]
 		);
 
 		assert_eq!(
-			match_words_from_tokenized(&tokens, "f", "", "gfjk", Some(&TEST_WORDS))?,
+			match_words_from_tokens(&tokens, "f", "", "gfjk", Some(&TEST_WORDS))?,
 			vec!["fffggg"]
 		);
 
@@ -269,7 +267,7 @@ mod match_words_tests {
 		];
 
 		assert_eq!(
-			match_words_from_tokenized(&tokens, "", "", "", Some(&TEST_WORDS))?,
+			match_words_from_tokens(&tokens, "", "", "", Some(&TEST_WORDS))?,
 			vec!["jjkk".to_string(), "kkll".to_string()]
 		);
 
@@ -288,7 +286,7 @@ mod match_words_tests {
 		];
 
 		assert_eq!(
-			match_words_from_tokenized(&tokens, "", "", "", Some(&TEST_WORDS))?,
+			match_words_from_tokens(&tokens, "", "", "", Some(&TEST_WORDS))?,
 			vec!["aaabbb".to_string(), "bbbccc".to_string()]
 		);
 
@@ -299,7 +297,7 @@ mod match_words_tests {
 		];
 
 		assert_eq!(
-			match_words_from_tokenized(&tokens, "", "", "", Some(&TEST_WORDS))?,
+			match_words_from_tokens(&tokens, "", "", "", Some(&TEST_WORDS))?,
 			vec!["yenta".to_string(), "yes".to_string()]
 		);
 
@@ -312,7 +310,7 @@ mod match_words_tests {
 		];
 
 		assert_eq!(
-			match_words_from_tokenized(&token, "", "", "", Some(&TEST_WORDS))?,
+			match_words_from_tokens(&token, "", "", "", Some(&TEST_WORDS))?,
 			vec!["fffggg".to_string()]
 		);
 
@@ -330,7 +328,7 @@ mod match_words_tests {
 		];
 
 		assert_eq!(
-			match_words_from_tokenized(&tokens, "t", "", "ytanpem", Some(&TEST_WORDS))?,
+			match_words_from_tokens(&tokens, "t", "", "ytanpem", Some(&TEST_WORDS))?,
 			vec!["yenta".to_string()]
 		);
 

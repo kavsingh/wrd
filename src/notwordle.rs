@@ -3,7 +3,7 @@ use std::sync::LazyLock;
 use regex::Regex;
 
 use crate::{
-	match_words::{match_words_from_tokenized, MatcherToken},
+	match_words::{match_words_from_tokens, MatcherToken},
 	util::{non_empty_str, unique_string},
 };
 
@@ -51,7 +51,7 @@ impl Notwordle {
 		self.guess_results.push(new_result.clone());
 
 		let (tokens, include, exclude) = get_match_args_from_results(&self.guess_results);
-		let matches = match_words_from_tokenized(&tokens, &include, &exclude, "", None)?;
+		let matches = match_words_from_tokens(&tokens, &include, &exclude, "", None)?;
 
 		Ok((matches, new_result))
 	}
