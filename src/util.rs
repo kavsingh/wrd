@@ -1,13 +1,11 @@
 pub fn unique_string(str: &str) -> String {
-	let mut result: String = "".to_string();
-
-	for char in str.chars() {
-		if !result.contains(char) {
-			result.push(char);
+	str.chars().fold("".to_owned(), |mut acc: String, c| {
+		if !acc.contains(c) {
+			acc.push(c)
 		}
-	}
 
-	result
+		acc
+	})
 }
 
 #[cfg(test)]

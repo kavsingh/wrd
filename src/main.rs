@@ -15,20 +15,26 @@ struct Cli {
 enum Commands {
 	/// find word matches from patterns
 	Mw {
-		/// match words
-		/// character positions seperated by space
-		/// *: match anything in this position
-		/// any number of lowercase chars: match any of the chars in the string in this position
-		/// ! + any number of lowercase chars: exclude any of the chars in the string in this position
+		/// match words{n}
+		/// matches lowercase ascii only. character positions seperated by space
 		///
-		/// e.g.
-		///   '* b !ar !r *'
+		/// wrd mw -p '** * ae !bcd **'
 		///
-		///   1st position - match anything
-		///   2nd position - match 'b'
-		///   3rd position - do not match 'a' or 'r'
-		///   4th position - do not match 'r'
-		///   5th position - match anything
+		/// - **: match any number of any character{n}
+		/// - *: match any single character{n}
+		/// - a-z: match any of these chars (1 or more) in this position{n}
+		/// - !a-z: exclude any of these chars (1 or more) in this position
+		///
+		/// e.g.{n}
+		/// - match any word starting with "y" and "e"{n}
+		///   wrd mw -p 'y e **'
+		///
+		/// - match any word ending with "r" and "y" or "n" and "y"{n}
+		///   wrd mw -p '** rn y'
+		///
+		/// - match a five character word with "r" as 2nd char, "n" or "t"
+		///   as 4th char, and not "s" or "y" as the last character{n}
+		///   wrd mw -p '* r * nt !sy'
 		#[arg(short, long)]
 		pattern: String,
 
@@ -49,24 +55,24 @@ enum Commands {
 	Nw {
 		/// guess results: comma seperated list of guess results
 		///
-		/// a guess result is a space seperated list of the results of a guess:
-		///   - single a-z: letter in correct position
-		///   - ? + single a-z: letter in word but in wrong position
-		///   - ! + single a-z: letter not in word
+		/// a guess result is a space seperated list of the results of a guess:{n}
+		/// - single a-z: letter in correct position{n}
+		/// - ? + single a-z: letter in word but in wrong position{n}
+		/// - ! + single a-z: letter not in word{n}
 		///
-		/// e.g. encoding the result of the guess "plate" where
-		///   - 'p' is in correct position
-		///   - 'l' is in word but in wrong position
-		///   - 'a' is not in word
-		///   - 't' is in word but in wrong position
-		///   - 'e' is in correct position
+		/// e.g. encoding the result of the guess "plate" where:{n}
+		/// - 'p' is in correct position{n}
+		/// - 'l' is in word but in wrong position{n}
+		/// - 'a' is not in word{n}
+		/// - 't' is in word but in wrong position{n}
+		/// - 'e' is in correct position{n}
 		///
-		///   enter as: 'p ?l !a ?t e'
+		/// wrd nw 'p ?l !a ?t e'
 		///
-		///   to see words remaning from compounding guesses, provide a comma
-		///   seperated list of results
+		/// to see words remaning from compounding guesses, provide a comma
+		/// seperated list of results:
 		///
-		///   'p ?l !a ?t e,p ?o l ?i t'
+		/// wrd nw 'p ?l !a ?t e,p ?o l ?i t'
 		///
 		#[arg(short, long)]
 		guess_results: String,

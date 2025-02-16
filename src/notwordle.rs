@@ -1,9 +1,9 @@
 use std::sync::LazyLock;
 
-use regex_lite::Regex;
+use regex::Regex;
 
 use crate::{
-	match_words::{match_words_from_tokenized, MatchCharsToken, MatcherToken},
+	match_words::{match_words_from_tokenized, MatcherToken},
 	util::unique_string,
 };
 
@@ -52,7 +52,7 @@ impl Notwordle {
 		self.guess_results.push(new_result.clone());
 
 		let (tokens, include, exclude) = get_match_args_from_results(&self.guess_results);
-		let matches = match_words_from_tokenized(&tokens, &include, &exclude, "", None);
+		let matches = match_words_from_tokenized(&tokens, &include, &exclude, "", None)?;
 
 		Ok((matches, new_result))
 	}
@@ -105,10 +105,10 @@ fn tokenize_guess_result(input: &str) -> Result<Vec<GuessResultToken>, String> {
 
 fn get_match_args_from_results(
 	guess_results: &[Vec<GuessResultToken>],
-) -> (MatcherToken, String, String) {
+) -> (Vec<MatcherToken>, String, String) {
 	let mut include = "".to_string();
 	let mut exclude = "".to_string();
-	let mut match_tokens: Vec<MatchCharsToken> = vec![];
+	let mut match_tokens: Vec<MatcherToken> = vec![];
 
 	for result in guess_results {
 		for (i, result_char) in result.iter().enumerate() {
@@ -122,20 +122,20 @@ fn get_match_args_from_results(
 			}
 
 			let resolved_op = match result_char {
-				GuessResultToken::Right(c) => MatchCharsToken::MatchAnyCharIn(c.to_string()),
+				GuessResultToken::Right(c) => MatcherToken::MatchAnyCharIn(c.to_string()),
 				GuessResultToken::Wrong(c) | GuessResultToken::WrongPosition(c) => {
-					let candidate_op = MatchCharsToken::ExcludeAllCharsIn(c.to_string());
+					let candidate_op = MatcherToken::ExcludeAllCharsIn(c.to_string());
 					let current_op = match_tokens.get(i);
 
 					match (&candidate_op, current_op) {
 						(
-							MatchCharsToken::ExcludeAllCharsIn(a),
-							Some(MatchCharsToken::ExcludeAllCharsIn(b)),
+							MatcherToken::ExcludeAllCharsIn(a),
+							Some(MatcherToken::ExcludeAllCharsIn(b)),
 						) => {
 							let mut acc = b.to_owned();
 
 							acc.push_str(&a.clone());
-							MatchCharsToken::ExcludeAllCharsIn(unique_string(&acc))
+							MatcherToken::ExcludeAllCharsIn(unique_string(&acc))
 						}
 						_ => candidate_op,
 					}
@@ -151,7 +151,7 @@ fn get_match_args_from_results(
 	}
 
 	(
-		MatcherToken::MatchOnChars((match_tokens, None)),
+		match_tokens,
 		unique_string(&include),
 		unique_string(&exclude),
 	)
@@ -216,16 +216,13 @@ mod match_args_tests {
 		assert_eq!(exclude, "ae".to_string());
 		assert_eq!(
 			pattern,
-			MatcherToken::MatchOnChars((
-				vec![
-					MatchCharsToken::MatchAnyCharIn("p".to_string()),
-					MatchCharsToken::ExcludeAllCharsIn("l".to_string()),
-					MatchCharsToken::ExcludeAllCharsIn("a".to_string()),
-					MatchCharsToken::ExcludeAllCharsIn("t".to_string()),
-					MatchCharsToken::ExcludeAllCharsIn("e".to_string()),
-				],
-				None
-			))
+			vec![
+				MatcherToken::MatchAnyCharIn("p".to_string()),
+				MatcherToken::ExcludeAllCharsIn("l".to_string()),
+				MatcherToken::ExcludeAllCharsIn("a".to_string()),
+				MatcherToken::ExcludeAllCharsIn("t".to_string()),
+				MatcherToken::ExcludeAllCharsIn("e".to_string()),
+			]
 		);
 
 		// polit (whatever)
@@ -244,16 +241,13 @@ mod match_args_tests {
 		assert_eq!(exclude, "ae".to_string());
 		assert_eq!(
 			pattern,
-			MatcherToken::MatchOnChars((
-				vec![
-					MatchCharsToken::MatchAnyCharIn("p".to_string()),
-					MatchCharsToken::ExcludeAllCharsIn("lo".to_string()),
-					MatchCharsToken::MatchAnyCharIn("l".to_string()),
-					MatchCharsToken::ExcludeAllCharsIn("ti".to_string()),
-					MatchCharsToken::MatchAnyCharIn("t".to_string()),
-				],
-				None
-			))
+			vec![
+				MatcherToken::MatchAnyCharIn("p".to_string()),
+				MatcherToken::ExcludeAllCharsIn("lo".to_string()),
+				MatcherToken::MatchAnyCharIn("l".to_string()),
+				MatcherToken::ExcludeAllCharsIn("ti".to_string()),
+				MatcherToken::MatchAnyCharIn("t".to_string()),
+			]
 		);
 
 		Ok(())
