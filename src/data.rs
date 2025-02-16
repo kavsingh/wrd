@@ -1,5 +1,6 @@
-use rust_embed::Embed;
 use std::{str, sync::LazyLock};
+
+use rust_embed::Embed;
 
 #[derive(Embed)]
 #[folder = "data"]
@@ -11,14 +12,15 @@ static WORD_DATA: LazyLock<Vec<u8>> = LazyLock::new(load_word_data);
 pub static WORDS: LazyLock<Vec<&str>> = LazyLock::new(parse_word_list);
 
 fn load_word_data() -> Vec<u8> {
-	let dict = Assets::get("words.txt").expect("could not get word list");
-
-	dict.data.into_owned()
+	Assets::get("words.txt")
+		.expect("could not load word list")
+		.data
+		.into_owned()
 }
 
 fn parse_word_list() -> Vec<&'static str> {
-	let content = str::from_utf8(&WORD_DATA).expect("could not load word list");
-	let mut words: Vec<&str> = content
+	str::from_utf8(&WORD_DATA)
+		.expect("could not read word list")
 		.lines()
 		.filter_map(|line| {
 			let trimmed = line.trim();
@@ -29,8 +31,5 @@ fn parse_word_list() -> Vec<&'static str> {
 				Some(trimmed)
 			}
 		})
-		.collect();
-
-	words.sort_unstable();
-	words
+		.collect()
 }
