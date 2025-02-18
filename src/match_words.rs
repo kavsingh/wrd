@@ -1,11 +1,6 @@
-/*
-'* * q u e s' >  /^[a-z]{1}[a-z]{1}ques$/
-'** qr !sed * **' > /^[a-z]*[qr]{1}(?![sed])[a-z]{1}[a-z]*$/
- */
-
 use std::sync::LazyLock;
 
-use regex::Regex;
+use fancy_regex::Regex;
 
 use crate::{data::WORDS, util::non_empty_str};
 
@@ -57,30 +52,38 @@ pub fn match_words_from_tokens<'a>(
 	let result: Vec<&str> = words
 		.unwrap_or_else(|| &WORDS)
 		.iter()
-		.filter(|word| match_word(word, &regex, include, exclude, within))
+		.filter(|word| match_word(word, &regex, include, exclude, within).unwrap_or(false))
 		.cloned()
 		.collect();
 
 	Ok(result)
 }
 
-fn match_word(word: &str, matcher: &Regex, include: &str, exclude: &str, within: &str) -> bool {
+fn match_word(
+	word: &str,
+	matcher: &Regex,
+	include: &str,
+	exclude: &str,
+	within: &str,
+) -> Result<bool, String> {
 	// word can only contain letters within this group
 	if !within.is_empty() && word.chars().any(|c| !within.contains(c)) {
-		return false;
+		return Ok(false);
 	}
 
 	// word must include all of these letters
 	if !include.is_empty() && include.chars().any(|c| !word.contains(c)) {
-		return false;
+		return Ok(false);
 	}
 
 	// word must not include any of these letters
 	if !exclude.is_empty() && exclude.chars().any(|c| word.contains(c)) {
-		return false;
+		return Ok(false);
 	}
 
-	matcher.is_match(word)
+	matcher
+		.is_match(word)
+		.map_err(|err| format!("could not match: {err}"))
 }
 
 fn regex_from_tokens(tokens: &[MatcherToken]) -> Result<Regex, String> {
@@ -88,9 +91,9 @@ fn regex_from_tokens(tokens: &[MatcherToken]) -> Result<Regex, String> {
 		.iter()
 		.map(|token| match token {
 			MatcherToken::MatchAnyChars => r"[a-z]*".to_string(),
-			MatcherToken::MatchAnyChar => r"[a-z]{1}".to_string(),
-			MatcherToken::MatchAnyCharIn(chars) => format!("[{chars}]{{1}}"),
-			MatcherToken::ExcludeAllCharsIn(chars) => format!("[a-z[^{chars}]]{{1}}"),
+			MatcherToken::MatchAnyChar => r"[a-z]".to_string(),
+			MatcherToken::MatchAnyCharIn(chars) => format!("[{chars}]"),
+			MatcherToken::ExcludeAllCharsIn(chars) => format!("(?![{chars}])[a-z]"),
 		})
 		.collect::<String>();
 	let bounded = format!("^{pattern}$");
@@ -137,8 +140,8 @@ fn tokenize(input: &str) -> Result<MatcherToken, String> {
 	}
 
 	let captures = match MATCH_CHARS_TOKEN_REGEX.captures(input) {
-		Some(c) => c,
-		None => return Err(format!("invalid input {input}")),
+		Ok(Some(c)) => c,
+		_ => return Err(format!("invalid input {input}")),
 	};
 
 	match (
@@ -331,6 +334,20 @@ mod match_words_tests {
 			match_words_from_tokens(&tokens, "t", "", "ytanpem", Some(&TEST_WORDS))?,
 			vec!["yenta".to_string()]
 		);
+
+		let tokens = [
+			MatcherToken::ExcludeAllCharsIn("ps".to_string()),
+			MatcherToken::ExcludeAllCharsIn("lt".to_string()),
+			MatcherToken::MatchAnyCharIn("a".to_string()),
+			MatcherToken::ExcludeAllCharsIn("tl".to_string()),
+			MatcherToken::ExcludeAllCharsIn("ek".to_string()),
+		];
+		let test_words = [
+			"blast", "flats", "loath", "slant", "slats", "stalk", "stall", "trail", "trawl",
+		];
+		let result = match_words_from_tokens(&tokens, "lat", "pesk", "", Some(&test_words))?;
+
+		assert_eq!(result, vec!["trail", "trawl"]);
 
 		Ok(())
 	}

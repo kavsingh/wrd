@@ -1,6 +1,6 @@
 use std::sync::LazyLock;
 
-use regex::Regex;
+use fancy_regex::Regex;
 
 use crate::{
 	match_words::{match_words_from_tokens, MatcherToken},
@@ -58,7 +58,7 @@ impl Notwordle {
 }
 
 static GUESS_TOKEN_REGEX: LazyLock<Regex> =
-	LazyLock::new(|| Regex::new(r"^([!?]{1})?([a-z]{1})$").expect("invalid guess regex"));
+	LazyLock::new(|| Regex::new(r"^([!?])?([a-z])$").expect("invalid guess regex"));
 
 fn tokenize_guess_result(input: &str) -> Result<Vec<GuessResultToken>, String> {
 	let entries: Vec<_> = input.split(" ").filter_map(non_empty_str).collect();
@@ -66,8 +66,8 @@ fn tokenize_guess_result(input: &str) -> Result<Vec<GuessResultToken>, String> {
 
 	for entry in entries.iter() {
 		let captures = match GUESS_TOKEN_REGEX.captures(entry) {
-			Some(cap) => cap,
-			None => return Err(format!("invalid input {entry}")),
+			Ok(Some(cap)) => cap,
+			_ => return Err(format!("invalid input {entry}")),
 		};
 
 		match (
@@ -151,6 +151,27 @@ mod tokenize_tests {
 		};
 
 		assert_eq!(result, "invalid input aa");
+
+		let result = match tokenize_guess_result("p ??q !r a") {
+			Ok(_) => panic!("should not pass"),
+			Err(message) => message,
+		};
+
+		assert_eq!(result, "invalid input ??q");
+
+		let result = match tokenize_guess_result("p ?q !?r a") {
+			Ok(_) => panic!("should not pass"),
+			Err(message) => message,
+		};
+
+		assert_eq!(result, "invalid input !?r");
+
+		let result = match tokenize_guess_result("p? ?q !r a") {
+			Ok(_) => panic!("should not pass"),
+			Err(message) => message,
+		};
+
+		assert_eq!(result, "invalid input p?");
 	}
 
 	#[test]
@@ -231,6 +252,41 @@ mod match_args_tests {
 				MatcherToken::MatchAnyCharIn("t".to_string()),
 			]
 		);
+
+		//
+
+		let guesses = [
+			// !p ?l a ?t !e
+			vec![
+				GuessResultToken::Wrong("p".to_string()),
+				GuessResultToken::WrongPosition("l".to_string()),
+				GuessResultToken::Right("a".to_string()),
+				GuessResultToken::WrongPosition("t".to_string()),
+				GuessResultToken::Wrong("e".to_string()),
+			],
+			// !s ?t a ?l !k'
+			vec![
+				GuessResultToken::Wrong("s".to_string()),
+				GuessResultToken::WrongPosition("t".to_string()),
+				GuessResultToken::Right("a".to_string()),
+				GuessResultToken::WrongPosition("l".to_string()),
+				GuessResultToken::Wrong("k".to_string()),
+			],
+		];
+		let (pattern, include, exclude) = get_match_args_from_results(&guesses);
+
+		assert_eq!(
+			pattern,
+			vec![
+				MatcherToken::ExcludeAllCharsIn("ps".to_string()),
+				MatcherToken::ExcludeAllCharsIn("lt".to_string()),
+				MatcherToken::MatchAnyCharIn("a".to_string()),
+				MatcherToken::ExcludeAllCharsIn("tl".to_string()),
+				MatcherToken::ExcludeAllCharsIn("ek".to_string()),
+			]
+		);
+		assert_eq!(include, "lat".to_string());
+		assert_eq!(exclude, "pesk".to_string());
 
 		Ok(())
 	}
