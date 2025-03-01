@@ -9,7 +9,10 @@ jobs:
   test-lint:
     name: Test and lint
     runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: "-Dwarnings"
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
       - run: cargo test
+      - run: cargo clippy --all-targets --all-features
