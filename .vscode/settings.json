@@ -12,6 +12,8 @@
 	},
 
 	"rust-analyzer.check.command": "clippy",
+	"rust-analyzer.diagnostics.styleLints.enable": true,
+	"rust-analyzer.rustfmt.extraArgs": ["+nightly"],
 
 	"prettier.useTabs": true,
 

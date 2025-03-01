@@ -2,7 +2,8 @@ use std::sync::LazyLock;
 
 use fancy_regex::Regex;
 
-use crate::{data::WORDS, util::non_empty_str};
+use crate::data::WORDS;
+use crate::util::non_empty_str;
 
 #[derive(Clone, Debug)]
 pub enum MatcherToken {

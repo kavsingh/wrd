@@ -2,10 +2,8 @@ use std::sync::LazyLock;
 
 use fancy_regex::Regex;
 
-use crate::{
-	match_words::{match_words_from_tokens, MatcherToken},
-	util::{non_empty_str, unique_string},
-};
+use crate::match_words::{MatcherToken, match_words_from_tokens};
+use crate::util::{non_empty_str, unique_string};
 
 #[derive(Default)]
 pub struct Notwordle {
@@ -195,9 +193,8 @@ mod tokenize_tests {
 
 #[cfg(test)]
 mod match_args_tests {
-	use crate::match_words::MatcherToken;
-
 	use super::*;
+	use crate::match_words::MatcherToken;
 
 	#[test]
 	fn should_build_match_inputs_from_guesses() -> Result<(), String> {

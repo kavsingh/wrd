@@ -1,4 +1,6 @@
-use std::{borrow::Cow, str, sync::LazyLock};
+use std::borrow::Cow;
+use std::str;
+use std::sync::LazyLock;
 
 use rust_embed::Embed;
 

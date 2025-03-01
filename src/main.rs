@@ -1,7 +1,6 @@
 use std::process;
 
 use clap::{Parser, Subcommand};
-
 use wrd::{match_words_runner, notwordle_runner};
 
 #[derive(Parser, Debug)]
