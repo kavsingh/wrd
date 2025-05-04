@@ -28,7 +28,7 @@ enum Commands {
 		/// - match any word starting with "y" and "e"{n}
 		///   wrd mw -p 'y e **'
 		///
-		/// - match any word ending with "r" and "y" or "n" and "y"{n}
+		/// - match any word ending with "ry" or "ny"{n}
 		///   wrd mw -p '** rn y'
 		///
 		/// - match a five character word with "r" as 2nd char, "n" or "t"
@@ -37,17 +37,29 @@ enum Commands {
 		#[arg(short, long)]
 		pattern: String,
 
-		/// word must include all of these letters
+		/// words can only contain characters within this group
+		///
+		/// e.g.{n}
+		/// - find all imperfect anagrams{n}
+		///   wrd mw -p '**' -w 'theword'
+		#[arg(short, long, default_value_t = ("").to_string())]
+		within: String,
+
+		/// word must include all of these characters
+		///
+		/// e.g.{n}
+		/// - find all perfect anagrams{n}
+		///   wrd mw -p '* * * * * *' -i 'miters'
+		///
+		/// - find all permutations with at least 4 characters{n}
+		///   and containing a key character{n}
+		///   wrd mw -p '* * * * **' -i 'd' -w 'abcdefg'
 		#[arg(short, long, default_value_t = ("").to_string())]
 		include: String,
 
-		/// words must not include any of these letters
+		/// words must not include any of these characters
 		#[arg(short, long, default_value_t = ("").to_string())]
 		exclude: String,
-
-		/// words can only contain letters within this group
-		#[arg(short, long, default_value_t = ("").to_string())]
-		within: String,
 	},
 
 	// see words left after guesses
