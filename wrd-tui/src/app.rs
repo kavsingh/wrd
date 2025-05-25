@@ -1,12 +1,13 @@
 use color_eyre::Result;
 use color_eyre::eyre::WrapErr;
 use ratatui::buffer::Buffer;
-use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
-use ratatui::layout::{Constraint, Layout, Rect};
+use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
+use ratatui::layout::Constraint::{Length, Min};
+use ratatui::layout::{Layout, Rect};
 use ratatui::style::palette::tailwind;
 use ratatui::style::{Color, Stylize};
 use ratatui::symbols::border;
-use ratatui::text::{Line, Text};
+use ratatui::text::Line;
 use ratatui::widgets::{Block, Paragraph, Tabs, Widget};
 use ratatui::{DefaultTerminal, Frame};
 
@@ -15,8 +16,8 @@ use crate::app_tabs::{AppTab, AppTabIo, MatchWord, NotWordle};
 #[derive(Debug, Default)]
 enum Tab {
 	#[default]
-	Match,
-	Wordle,
+	MatchWord,
+	NotWordle,
 }
 
 #[derive(Default, Debug)]
@@ -51,22 +52,13 @@ impl App {
 
 	fn get_current_tab(&self) -> &dyn AppTab {
 		match self.selected_tab {
-			Tab::Match => &self.match_word,
-			Tab::Wordle => &self.not_wordle,
+			Tab::MatchWord => &self.match_word,
+			Tab::NotWordle => &self.not_wordle,
 		}
 	}
 
 	fn handle_key_event(&mut self, key_event: KeyEvent) -> Result<()> {
-		let _current_tab = self.get_current_tab();
-
-		if key_event.kind != KeyEventKind::Press {
-			return Ok(());
-			// @TODO
-			// return current_tab.handle_key_event(key_event);
-		}
-
 		match key_event.code {
-			// @TODO: can we use abort signals etc?
 			KeyCode::Char('c') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
 				self.exit()
 			}
@@ -75,10 +67,7 @@ impl App {
 					self.go_to_tab(num as usize);
 				}
 			}
-			_ => {
-				// @TODO
-				// return current_tab.handle_key_event(key_event);
-			}
+			_ => (),
 		}
 
 		Ok(())
@@ -86,8 +75,16 @@ impl App {
 
 	fn go_to_tab(&mut self, tab_num: usize) {
 		match tab_num {
-			1 => self.selected_tab = Tab::Match,
-			2 => self.selected_tab = Tab::Wordle,
+			1 => {
+				self.selected_tab = Tab::MatchWord;
+				self.match_word.set_active(true);
+				self.not_wordle.set_active(false);
+			}
+			2 => {
+				self.selected_tab = Tab::NotWordle;
+				self.match_word.set_active(false);
+				self.not_wordle.set_active(true);
+			}
 			_ => (),
 		}
 	}
@@ -99,8 +96,8 @@ impl App {
 			.map(|(i, label)| format!(" {label} ({}) ", i + 1));
 		let highlight_style = (Color::default(), tailwind::BLUE.c700);
 		let selected_tab_index = match &self.selected_tab {
-			Tab::Match => 0,
-			Tab::Wordle => 1,
+			Tab::MatchWord => 0,
+			Tab::NotWordle => 1,
 		};
 		let block = Block::bordered()
 			.title(Line::from(" WRD ".bold()))
@@ -132,13 +129,17 @@ impl App {
 
 	fn render_body(&self, area: Rect, buf: &mut Buffer) {
 		let block = Block::bordered()
-			.border_set(border::THICK)
+			.border_set(border::DOUBLE)
 			.title(format!(" {} ", self.get_current_tab().label()));
 
-		Paragraph::new(Text::from("here we are"))
-			.centered()
-			.block(block)
-			.render(area, buf);
+		let content_area = block.inner(area);
+
+		match self.selected_tab {
+			Tab::MatchWord => self.match_word.clone().render(content_area, buf),
+			Tab::NotWordle => self.not_wordle.clone().render(content_area, buf),
+		}
+
+		block.render(area, buf);
 	}
 
 	fn exit(&mut self) {
@@ -148,7 +149,6 @@ impl App {
 
 impl Widget for &App {
 	fn render(self, area: Rect, buf: &mut Buffer) {
-		use Constraint::{Length, Min};
 		let vertical = Layout::vertical([Length(3), Min(0), Length(3)]);
 		let [header_area, body_area, footer_area] = vertical.areas(area);
 
