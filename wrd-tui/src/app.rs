@@ -10,18 +10,13 @@ use ratatui::text::{Line, Text};
 use ratatui::widgets::{Block, Paragraph, Tabs, Widget};
 use ratatui::{DefaultTerminal, Frame};
 
-use crate::app_tabs::{AppTab, MatchWord, NotWordle};
+use crate::app_tabs::{AppTab, AppTabIo, MatchWord, NotWordle};
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 enum Tab {
+	#[default]
 	Match,
 	Wordle,
-}
-
-impl Default for Tab {
-	fn default() -> Self {
-		Self::Match
-	}
 }
 
 #[derive(Default, Debug)]
