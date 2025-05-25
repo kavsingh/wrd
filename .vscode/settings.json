@@ -15,6 +15,7 @@
 	"rust-analyzer.diagnostics.styleLints.enable": true,
 	"rust-analyzer.rustfmt.extraArgs": ["+nightly"],
 
+	"prettier.enable": true,
 	"prettier.useTabs": true,
 
 	"[rust]": {

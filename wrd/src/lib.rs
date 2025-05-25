@@ -1,14 +1,7 @@
-mod data;
-mod match_words;
-mod notwordle;
-mod util;
-
 use std::error::Error;
 
 use colored::Colorize;
-
-use crate::match_words::match_words;
-use crate::notwordle::{GuessResultToken, Notwordle};
+use wrd_lib::{GuessResultToken, Notwordle, match_words};
 
 pub fn match_words_runner(
 	pattern: &str,

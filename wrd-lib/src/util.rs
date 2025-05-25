@@ -24,6 +24,6 @@ mod tests {
 
 	#[test]
 	fn should_return_a_unique_string_keeping_order() {
-		assert_eq!(unique_string("abcdeacbede"), "abcde".to_string());
+		assert_eq!(unique_string("accbcdeacbede"), "acbde".to_string());
 	}
 }

@@ -14,7 +14,6 @@ struct Cli {
 enum Commands {
 	/// find word matches from patterns
 	Mw {
-		/// match words{n}
 		/// matches lowercase ascii only. character positions seperated by space
 		///
 		/// wrd mw -p '** * ae !bcd **'
