@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-clap = { version = "4.5.37", features = ["derive"] }
+clap = { version = "4.5.38", features = ["derive"] }
 colored = "3.0.0"
 fancy-regex = '0.14.0'
-rust-embed = "8.7.0"
+rust-embed = "8.7.2"
