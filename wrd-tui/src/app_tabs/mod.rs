@@ -1,9 +1,9 @@
 use ratatui::widgets::Widget;
 
-mod match_word;
+mod match_words;
 mod not_wordle;
 
-pub use match_word::MatchWord;
+pub use match_words::MatchWords;
 pub use not_wordle::NotWordle;
 
 pub trait AppTab: AppTabIo + Widget {}

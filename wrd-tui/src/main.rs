@@ -5,6 +5,7 @@ use crate::app::App;
 
 mod app;
 mod app_tabs;
+mod widgets;
 
 fn main() -> Result<()> {
 	color_eyre::install()?;
