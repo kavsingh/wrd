@@ -11,18 +11,18 @@ use ratatui::text::Line;
 use ratatui::widgets::{Block, Paragraph, Tabs, Widget};
 use ratatui::{DefaultTerminal, Frame};
 
-use crate::app_tabs::{AppTab, AppTabIo, MatchWord, NotWordle};
+use crate::app_tabs::{AppTab, AppTabIo, MatchWords, NotWordle};
 
 #[derive(Debug, Default)]
 enum Tab {
 	#[default]
-	MatchWord,
+	MatchWords,
 	NotWordle,
 }
 
 #[derive(Default, Debug)]
 pub struct App {
-	match_word: MatchWord,
+	match_words: MatchWords,
 	not_wordle: NotWordle,
 	selected_tab: Tab,
 	exit: bool,
@@ -52,7 +52,7 @@ impl App {
 
 	fn get_current_tab(&self) -> &dyn AppTab {
 		match self.selected_tab {
-			Tab::MatchWord => &self.match_word,
+			Tab::MatchWords => &self.match_words,
 			Tab::NotWordle => &self.not_wordle,
 		}
 	}
@@ -76,13 +76,13 @@ impl App {
 	fn go_to_tab(&mut self, tab_num: usize) {
 		match tab_num {
 			1 => {
-				self.selected_tab = Tab::MatchWord;
-				self.match_word.set_active(true);
+				self.selected_tab = Tab::MatchWords;
+				self.match_words.set_active(true);
 				self.not_wordle.set_active(false);
 			}
 			2 => {
 				self.selected_tab = Tab::NotWordle;
-				self.match_word.set_active(false);
+				self.match_words.set_active(false);
 				self.not_wordle.set_active(true);
 			}
 			_ => (),
@@ -90,13 +90,13 @@ impl App {
 	}
 
 	fn render_header(&self, area: Rect, buf: &mut Buffer) {
-		let labels = vec![self.match_word.label(), self.not_wordle.label()]
+		let labels = vec![self.match_words.label(), self.not_wordle.label()]
 			.into_iter()
 			.enumerate()
 			.map(|(i, label)| format!(" {label} ({}) ", i + 1));
 		let highlight_style = (Color::default(), tailwind::BLUE.c700);
 		let selected_tab_index = match &self.selected_tab {
-			Tab::MatchWord => 0,
+			Tab::MatchWords => 0,
 			Tab::NotWordle => 1,
 		};
 		let block = Block::bordered()
@@ -135,7 +135,7 @@ impl App {
 		let content_area = block.inner(area);
 
 		match self.selected_tab {
-			Tab::MatchWord => self.match_word.clone().render(content_area, buf),
+			Tab::MatchWords => self.match_words.clone().render(content_area, buf),
 			Tab::NotWordle => self.not_wordle.clone().render(content_area, buf),
 		}
 
