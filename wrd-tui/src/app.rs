@@ -20,12 +20,27 @@ enum Tab {
 	NotWordle,
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct App<'a> {
 	match_words: MatchWords<'a>,
 	not_wordle: NotWordle,
 	selected_tab: Tab,
 	exit: bool,
+}
+
+impl Default for App<'_> {
+	fn default() -> Self {
+		let mut match_words = MatchWords::default();
+
+		match_words.set_active(true);
+
+		Self {
+			match_words,
+			not_wordle: NotWordle::default(),
+			selected_tab: Tab::default(),
+			exit: false,
+		}
+	}
 }
 
 impl App<'_> {
@@ -42,12 +57,21 @@ impl App<'_> {
 	}
 
 	fn handle_events(&mut self) -> Result<()> {
-		match event::read()? {
-			Event::Key(key_event) => self
-				.handle_key_event(key_event)
-				.wrap_err_with(|| format!("handling key event failed:\n{key_event:#?}")),
-			_ => Ok(()),
+		let received_event = event::read()?;
+
+		if let Event::Key(key_event) = received_event {
+			self.handle_key_event(key_event)
+				.wrap_err_with(|| format!("handling key event failed:\n{key_event:#?}"))?;
 		}
+
+		self.match_words
+			.handle_event(&received_event)
+			.wrap_err("match words: handle events failed")?;
+		self.not_wordle
+			.handle_event(&received_event)
+			.wrap_err("not wordle: handle events failed")?;
+
+		Ok(())
 	}
 
 	fn get_current_tab(&self) -> &dyn AppTab {
