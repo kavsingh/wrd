@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use ratatui::buffer::Buffer;
 use ratatui::layout::Constraint::{Length, Min};
 use ratatui::layout::{Layout, Rect};
@@ -9,18 +11,19 @@ use super::{AppTab, AppTabIo};
 use crate::widgets::WordGrid;
 
 #[derive(Debug, Clone)]
-pub struct MatchWords {
+pub struct MatchWords<'a> {
 	is_active: bool,
 	pattern: String,
 	within: String,
 	include: String,
 	exclude: String,
 	results: Vec<&'static str>,
+	word_grid: WordGrid<'a>,
 }
 
 const LABEL: &str = "Match";
 
-impl Default for MatchWords {
+impl Default for MatchWords<'_> {
 	fn default() -> Self {
 		let pattern = "* * * **";
 		let within = "trubador";
@@ -35,11 +38,12 @@ impl Default for MatchWords {
 			exclude: exclude.into(),
 			results: wrd_lib::match_words(pattern, include, exclude, within, None)
 				.unwrap_or_default(),
+			word_grid: WordGrid::default(),
 		}
 	}
 }
 
-impl MatchWords {
+impl MatchWords<'_> {
 	fn render_inputs(&self, area: Rect, buf: &mut Buffer) {
 		let block = Block::bordered()
 			.border_set(border::PLAIN)
@@ -48,7 +52,7 @@ impl MatchWords {
 		block.render(area, buf);
 	}
 
-	fn render_results(&self, area: Rect, buf: &mut Buffer) {
+	fn render_results(&mut self, area: Rect, buf: &mut Buffer) {
 		let block = Block::bordered()
 			.border_set(border::PLAIN)
 			.title(" results ")
@@ -57,11 +61,12 @@ impl MatchWords {
 
 		block.render(area, buf);
 
-		WordGrid::new(self.results.clone()).render(grid_area, buf);
+		self.word_grid.update(&self.results);
+		self.word_grid.clone().render(grid_area, buf);
 	}
 }
 
-impl AppTabIo for MatchWords {
+impl AppTabIo for MatchWords<'_> {
 	fn label(&self) -> &'static str {
 		LABEL
 	}
@@ -71,8 +76,8 @@ impl AppTabIo for MatchWords {
 	}
 }
 
-impl Widget for MatchWords {
-	fn render(self, area: Rect, buf: &mut Buffer) {
+impl Widget for MatchWords<'_> {
+	fn render(mut self, area: Rect, buf: &mut Buffer) {
 		let [inputs_area, results_area] = Layout::vertical([Length(12), Min(0)]).areas(area);
 
 		self.render_inputs(inputs_area, buf);
@@ -80,4 +85,4 @@ impl Widget for MatchWords {
 	}
 }
 
-impl AppTab for MatchWords {}
+impl AppTab for MatchWords<'_> {}

@@ -21,14 +21,14 @@ enum Tab {
 }
 
 #[derive(Default, Debug)]
-pub struct App {
-	match_words: MatchWords,
+pub struct App<'a> {
+	match_words: MatchWords<'a>,
 	not_wordle: NotWordle,
 	selected_tab: Tab,
 	exit: bool,
 }
 
-impl App {
+impl App<'_> {
 	pub fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
 		while !self.exit {
 			terminal.draw(|frame| self.draw(frame))?;
@@ -147,7 +147,7 @@ impl App {
 	}
 }
 
-impl Widget for &App {
+impl Widget for &App<'_> {
 	fn render(self, area: Rect, buf: &mut Buffer) {
 		let vertical = Layout::vertical([Length(3), Min(0), Length(3)]);
 		let [header_area, body_area, footer_area] = vertical.areas(area);
