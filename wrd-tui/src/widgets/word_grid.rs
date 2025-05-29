@@ -3,27 +3,28 @@ use ratatui::layout::Constraint::Min;
 use ratatui::layout::Rect;
 use ratatui::widgets::{Row, Table, Widget};
 
+const COLUMNS: usize = 10;
+
 #[derive(Default, Debug, Clone)]
-pub struct WordGrid {
-	words: Vec<&'static str>,
+pub struct WordGrid<'a> {
+	rows: Vec<Row<'a>>,
 }
 
-impl WordGrid {
-	pub fn new(words: Vec<&'static str>) -> Self {
-		Self { words }
+impl WordGrid<'_> {
+	pub fn update(&mut self, words: &Vec<&'static str>) {
+		self.rows = words
+			.chunks(COLUMNS)
+			.map(|row| Row::new::<Vec<&str>>(row.into()))
+			.collect();
 	}
 }
 
-impl Widget for WordGrid {
+impl Widget for WordGrid<'_> {
 	fn render(self, area: Rect, buf: &mut Buffer) {
-		let columns: usize = 10;
-		let widths = (0..columns).map(|_| Min(0));
-		let rows: Vec<Row> = self
-			.words
-			.chunks(columns)
-			.map(|row| Row::new::<Vec<&str>>(row.into()))
-			.collect();
+		let widths = (0..COLUMNS).map(|_| Min(0));
 
-		Table::new(rows, widths).column_spacing(1).render(area, buf);
+		Table::new(self.rows, widths)
+			.column_spacing(1)
+			.render(area, buf);
 	}
 }
