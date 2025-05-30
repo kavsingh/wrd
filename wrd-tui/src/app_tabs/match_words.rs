@@ -1,17 +1,20 @@
 use color_eyre::eyre::Result;
+use crossterm::event::KeyModifiers;
 use ratatui::buffer::Buffer;
-use ratatui::crossterm::event::{Event, KeyCode, KeyEvent};
+use ratatui::crossterm::event::{Event, KeyCode};
 use ratatui::layout::Constraint::{Length, Min};
 use ratatui::layout::{Layout, Rect};
+use ratatui::style::Style;
+use ratatui::style::palette::tailwind;
 use ratatui::symbols::border;
-use ratatui::text::Text;
 use ratatui::widgets::{Block, Padding, Paragraph, Widget};
 use tui_input::Input;
+use tui_input::backend::crossterm::EventHandler;
 
 use super::{AppTab, AppTabIo};
 use crate::widgets::WordGrid;
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, PartialEq)]
 enum TargetInput {
 	#[default]
 	None,
@@ -61,18 +64,14 @@ impl Default for MatchWords<'_> {
 }
 
 impl MatchWords<'_> {
-	fn handle_key_event(&mut self, event: &KeyEvent) -> Result<()> {
-		match event.code {
-			KeyCode::Char('p') => self.target_input = TargetInput::Pattern,
-			KeyCode::Char('w') => self.target_input = TargetInput::Within,
-			KeyCode::Char('i') => self.target_input = TargetInput::Include,
-			KeyCode::Char('e') => self.target_input = TargetInput::Exclude,
-			KeyCode::Esc => self.target_input = TargetInput::None,
-			KeyCode::Enter => self.refresh_results(),
-			_ => (),
-		}
-
-		Ok(())
+	fn forward_event_to_input(&mut self, event: &Event) {
+		let _ = match self.target_input {
+			TargetInput::Pattern => self.pattern_input.handle_event(event),
+			TargetInput::Within => self.within_input.handle_event(event),
+			TargetInput::Include => self.include_input.handle_event(event),
+			TargetInput::Exclude => self.exclude_input.handle_event(event),
+			_ => None,
+		};
 	}
 
 	fn refresh_results(&mut self) {
@@ -87,30 +86,49 @@ impl MatchWords<'_> {
 
 		self.results = results;
 		self.word_grid.update(&self.results);
+		self.target_input = TargetInput::None;
 	}
 
 	fn render_inputs(&self, area: Rect, buf: &mut Buffer) {
-		let block = Block::bordered()
-			.border_set(border::PLAIN)
-			.title(" Inputs ");
+		let [pattern_area, within_area, include_area, exclude_area] =
+			Layout::vertical([Length(1), Length(1), Length(1), Length(1)]).areas(area);
 
-		let block_area = block.inner(area);
+		let width = area.width;
 
-		block.render(area, buf);
+		Paragraph::new(format!(" <Ctrl+p> pattern: {}", self.pattern_input.value()))
+			.scroll((0, self.pattern_input.visual_scroll(width as usize) as u16))
+			.style(self.input_style(self.target_input == TargetInput::Pattern))
+			.render(pattern_area, buf);
 
-		// block.render(area, buf);
-		let width = area.width.max(3) - 3;
-		let scroll = self.pattern_input.visual_scroll(width as usize);
+		Paragraph::new(format!(" <Ctrl+w> within: {}", self.within_input.value()))
+			.scroll((0, self.within_input.visual_scroll(width as usize) as u16))
+			.style(self.input_style(self.target_input == TargetInput::Within))
+			.render(within_area, buf);
 
-		Paragraph::new(self.pattern_input.value())
-			.scroll((0, scroll as u16))
-			.block(Block::bordered().title(" Pattern "))
-			.render(block_area, buf);
+		Paragraph::new(format!(" <Ctrl+i> include: {}", self.include_input.value()))
+			.scroll((0, self.include_input.visual_scroll(width as usize) as u16))
+			.style(self.input_style(self.target_input == TargetInput::Include))
+			.render(include_area, buf);
+
+		Paragraph::new(format!(" <Ctrl+e> exclude: {}", self.exclude_input.value()))
+			.scroll((0, self.exclude_input.visual_scroll(width as usize) as u16))
+			.style(self.input_style(self.target_input == TargetInput::Exclude))
+			.render(exclude_area, buf);
 
 		// if self.input_mode == InputMode::Editing {
 		// 	let x = self.pattern_input.visual_cursor().max(scroll) - scroll + 1;
 		// 	frame.set_cursor_position((area.x + x as u16, area.y + 1))
 		// }
+	}
+
+	fn input_style(&self, is_active: bool) -> Style {
+		if is_active {
+			Style::default()
+				.bg(tailwind::ORANGE.c500)
+				.fg(tailwind::WHITE)
+		} else {
+			Style::default()
+		}
 	}
 
 	fn render_results(&mut self, area: Rect, buf: &mut Buffer) {
@@ -140,16 +158,27 @@ impl AppTabIo for MatchWords<'_> {
 			return Ok(());
 		}
 
-		match event {
-			Event::Key(key_event) => self.handle_key_event(key_event),
-			_ => Ok(()),
-		}
+		if let Event::Key(key_event) = event {
+			let has_ctrl = key_event.modifiers.contains(KeyModifiers::CONTROL);
+
+			match key_event.code {
+				KeyCode::Char('p') if has_ctrl => self.target_input = TargetInput::Pattern,
+				KeyCode::Char('w') if has_ctrl => self.target_input = TargetInput::Within,
+				KeyCode::Char('i') if has_ctrl => self.target_input = TargetInput::Include,
+				KeyCode::Char('e') if has_ctrl => self.target_input = TargetInput::Exclude,
+				KeyCode::Esc => self.target_input = TargetInput::None,
+				KeyCode::Enter => self.refresh_results(),
+				_ => self.forward_event_to_input(event),
+			}
+		};
+
+		Ok(())
 	}
 }
 
 impl Widget for MatchWords<'_> {
 	fn render(mut self, area: Rect, buf: &mut Buffer) {
-		let [inputs_area, results_area] = Layout::vertical([Length(12), Min(0)]).areas(area);
+		let [inputs_area, results_area] = Layout::vertical([Length(5), Min(0)]).areas(area);
 
 		self.render_inputs(inputs_area, buf);
 		self.render_results(results_area, buf);
