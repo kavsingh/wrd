@@ -54,6 +54,15 @@ impl App<'_> {
 
 	fn draw(&self, frame: &mut Frame) {
 		frame.render_widget(self, frame.area());
+
+		let cursor_position = self
+			.match_words
+			.get_cursor_position()
+			.or_else(|| self.not_wordle.get_cursor_position());
+
+		if let Some(position) = cursor_position {
+			frame.set_cursor_position(position)
+		}
 	}
 
 	fn handle_events(&mut self) -> Result<()> {
