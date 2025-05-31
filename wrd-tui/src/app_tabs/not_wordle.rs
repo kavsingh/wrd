@@ -35,6 +35,10 @@ impl AppTabIo for NotWordle {
 			_ => Ok(()),
 		}
 	}
+
+	fn get_cursor_position(&self) -> Option<(u16, u16)> {
+		None
+	}
 }
 
 impl Widget for NotWordle {

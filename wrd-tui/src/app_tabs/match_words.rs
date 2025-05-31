@@ -24,6 +24,28 @@ enum TargetInput {
 	Exclude,
 }
 
+impl TargetInput {
+	fn next(&self) -> Self {
+		match &self {
+			TargetInput::None => TargetInput::Pattern,
+			TargetInput::Pattern => TargetInput::Within,
+			TargetInput::Within => TargetInput::Include,
+			TargetInput::Include => TargetInput::Exclude,
+			TargetInput::Exclude => TargetInput::Pattern,
+		}
+	}
+
+	fn previous(&self) -> Self {
+		match &self {
+			TargetInput::None => TargetInput::Exclude,
+			TargetInput::Exclude => TargetInput::Include,
+			TargetInput::Include => TargetInput::Within,
+			TargetInput::Within => TargetInput::Pattern,
+			TargetInput::Pattern => TargetInput::Exclude,
+		}
+	}
+}
+
 #[derive(Debug, Clone)]
 pub struct MatchWords<'a> {
 	is_active: bool,
@@ -34,6 +56,7 @@ pub struct MatchWords<'a> {
 	exclude_input: Input,
 	results: Vec<&'static str>,
 	word_grid: WordGrid<'a>,
+	cursor_position: Option<(u16, u16)>,
 }
 
 const LABEL: &str = "Match";
@@ -57,6 +80,7 @@ impl Default for MatchWords<'_> {
 			within_input: Input::new(within.into()),
 			include_input: Input::new(include.into()),
 			exclude_input: Input::new(exclude.into()),
+			cursor_position: None,
 			results,
 			word_grid,
 		}
@@ -86,39 +110,53 @@ impl MatchWords<'_> {
 
 		self.results = results;
 		self.word_grid.update(&self.results);
-		self.target_input = TargetInput::None;
 	}
 
-	fn render_inputs(&self, area: Rect, buf: &mut Buffer) {
+	fn render_inputs(&mut self, area: Rect, buf: &mut Buffer) {
 		let [pattern_area, within_area, include_area, exclude_area] =
 			Layout::vertical([Length(1), Length(1), Length(1), Length(1)]).areas(area);
+		let inputs = [
+			(
+				&self.pattern_input,
+				pattern_area,
+				self.target_input == TargetInput::Pattern,
+				"<Ctrl+p> pattern",
+			),
+			(
+				&self.within_input,
+				within_area,
+				self.target_input == TargetInput::Within,
+				"<Ctrl+w> within",
+			),
+			(
+				&self.include_input,
+				include_area,
+				self.target_input == TargetInput::Include,
+				"<Ctrl+i> include",
+			),
+			(
+				&self.exclude_input,
+				exclude_area,
+				self.target_input == TargetInput::Exclude,
+				"<Ctrl+w> exclude",
+			),
+		];
 
-		let width = area.width;
+		self.cursor_position = None;
 
-		Paragraph::new(format!(" <Ctrl+p> pattern: {}", self.pattern_input.value()))
-			.scroll((0, self.pattern_input.visual_scroll(width as usize) as u16))
-			.style(self.input_style(self.target_input == TargetInput::Pattern))
-			.render(pattern_area, buf);
+		for (input, area, is_active, label) in inputs {
+			Paragraph::new(format!(" {label}: {}", input.value()))
+				.scroll((0, input.visual_scroll(area.width as usize) as u16))
+				.style(self.input_style(is_active))
+				.render(area, buf);
 
-		Paragraph::new(format!(" <Ctrl+w> within: {}", self.within_input.value()))
-			.scroll((0, self.within_input.visual_scroll(width as usize) as u16))
-			.style(self.input_style(self.target_input == TargetInput::Within))
-			.render(within_area, buf);
+			if is_active {
+				let scroll = input.visual_scroll(area.width as usize);
+				let x = input.visual_cursor().max(scroll) - scroll + 1;
 
-		Paragraph::new(format!(" <Ctrl+i> include: {}", self.include_input.value()))
-			.scroll((0, self.include_input.visual_scroll(width as usize) as u16))
-			.style(self.input_style(self.target_input == TargetInput::Include))
-			.render(include_area, buf);
-
-		Paragraph::new(format!(" <Ctrl+e> exclude: {}", self.exclude_input.value()))
-			.scroll((0, self.exclude_input.visual_scroll(width as usize) as u16))
-			.style(self.input_style(self.target_input == TargetInput::Exclude))
-			.render(exclude_area, buf);
-
-		// if self.input_mode == InputMode::Editing {
-		// 	let x = self.pattern_input.visual_cursor().max(scroll) - scroll + 1;
-		// 	frame.set_cursor_position((area.x + x as u16, area.y + 1))
-		// }
+				self.cursor_position = Some((area.x + x as u16, area.y + 1));
+			}
+		}
 	}
 
 	fn input_style(&self, is_active: bool) -> Style {
@@ -160,12 +198,15 @@ impl AppTabIo for MatchWords<'_> {
 
 		if let Event::Key(key_event) = event {
 			let has_ctrl = key_event.modifiers.contains(KeyModifiers::CONTROL);
+			let has_shift = key_event.modifiers.contains(KeyModifiers::SHIFT);
 
 			match key_event.code {
 				KeyCode::Char('p') if has_ctrl => self.target_input = TargetInput::Pattern,
 				KeyCode::Char('w') if has_ctrl => self.target_input = TargetInput::Within,
 				KeyCode::Char('i') if has_ctrl => self.target_input = TargetInput::Include,
 				KeyCode::Char('e') if has_ctrl => self.target_input = TargetInput::Exclude,
+				KeyCode::Tab if has_shift => self.target_input = self.target_input.previous(),
+				KeyCode::Tab => self.target_input = self.target_input.next(),
 				KeyCode::Esc => self.target_input = TargetInput::None,
 				KeyCode::Enter => self.refresh_results(),
 				_ => self.forward_event_to_input(event),
@@ -173,6 +214,10 @@ impl AppTabIo for MatchWords<'_> {
 		};
 
 		Ok(())
+	}
+
+	fn get_cursor_position(&self) -> Option<(u16, u16)> {
+		self.cursor_position
 	}
 }
 
