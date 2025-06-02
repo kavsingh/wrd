@@ -8,7 +8,7 @@ use ratatui::style::palette::tailwind;
 use ratatui::style::{Color, Stylize};
 use ratatui::symbols::border;
 use ratatui::text::Line;
-use ratatui::widgets::{Block, Paragraph, Tabs, Widget};
+use ratatui::widgets::{Block, Paragraph, StatefulWidget, StatefulWidgetRef, Tabs, Widget};
 use ratatui::{DefaultTerminal, Frame};
 
 use crate::app_tabs::{AppTab, AppTabIo, MatchWords, NotWordle};
@@ -28,6 +28,11 @@ pub struct App<'a> {
 	exit: bool,
 }
 
+#[derive(Default, Debug)]
+pub struct AppState {
+	pub cursor_position: Option<(u16, u16)>,
+}
+
 impl Default for App<'_> {
 	fn default() -> Self {
 		let mut match_words = MatchWords::default();
@@ -45,22 +50,19 @@ impl Default for App<'_> {
 
 impl App<'_> {
 	pub fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
+		let mut state = AppState::default();
+
 		while !self.exit {
-			terminal.draw(|frame| self.draw(frame))?;
+			terminal.draw(|frame| self.draw(frame, &mut state))?;
 			self.handle_events().wrap_err("handle events failed")?;
 		}
 		Ok(())
 	}
 
-	fn draw(&self, frame: &mut Frame) {
-		frame.render_widget(self, frame.area());
+	fn draw(&self, frame: &mut Frame, state: &mut AppState) {
+		frame.render_stateful_widget(self, frame.area(), state);
 
-		let cursor_position = self
-			.match_words
-			.get_cursor_position()
-			.or_else(|| self.not_wordle.get_cursor_position());
-
-		if let Some(position) = cursor_position {
+		if let Some(position) = state.cursor_position {
 			frame.set_cursor_position(position)
 		}
 	}
@@ -83,7 +85,7 @@ impl App<'_> {
 		Ok(())
 	}
 
-	fn get_current_tab(&self) -> &dyn AppTab {
+	fn get_current_tab(&self) -> &dyn AppTab<State = AppState> {
 		match self.selected_tab {
 			Tab::MatchWords => &self.match_words,
 			Tab::NotWordle => &self.not_wordle,
@@ -160,7 +162,7 @@ impl App<'_> {
 			.render(area, buf);
 	}
 
-	fn render_body(&self, area: Rect, buf: &mut Buffer) {
+	fn render_body(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
 		let block = Block::bordered()
 			.border_set(border::DOUBLE)
 			.title(format!(" {} ", self.get_current_tab().label()));
@@ -168,8 +170,8 @@ impl App<'_> {
 		let content_area = block.inner(area);
 
 		match self.selected_tab {
-			Tab::MatchWords => self.match_words.clone().render(content_area, buf),
-			Tab::NotWordle => self.not_wordle.clone().render(content_area, buf),
+			Tab::MatchWords => self.match_words.render_ref(content_area, buf, state),
+			Tab::NotWordle => self.not_wordle.render_ref(content_area, buf, state),
 		}
 
 		block.render(area, buf);
@@ -180,13 +182,15 @@ impl App<'_> {
 	}
 }
 
-impl Widget for &App<'_> {
-	fn render(self, area: Rect, buf: &mut Buffer) {
+impl StatefulWidget for &App<'_> {
+	type State = AppState;
+
+	fn render(self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
 		let vertical = Layout::vertical([Length(3), Min(0), Length(3)]);
 		let [header_area, body_area, footer_area] = vertical.areas(area);
 
 		self.render_header(header_area, buf);
-		self.render_body(body_area, buf);
+		self.render_body(body_area, buf, state);
 		self.render_footer(footer_area, buf);
 	}
 }

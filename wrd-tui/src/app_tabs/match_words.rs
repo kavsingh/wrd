@@ -7,11 +7,12 @@ use ratatui::layout::{Layout, Rect};
 use ratatui::style::Style;
 use ratatui::style::palette::tailwind;
 use ratatui::symbols::border;
-use ratatui::widgets::{Block, Padding, Paragraph, Widget};
+use ratatui::widgets::{Block, Padding, Paragraph, StatefulWidgetRef, Widget};
 use tui_input::Input;
 use tui_input::backend::crossterm::EventHandler;
 
 use super::{AppTab, AppTabIo};
+use crate::app::AppState;
 use crate::widgets::WordGrid;
 
 #[derive(Default, Debug, Clone, PartialEq)]
@@ -56,7 +57,6 @@ pub struct MatchWords<'a> {
 	exclude_input: Input,
 	results: Vec<&'static str>,
 	word_grid: WordGrid<'a>,
-	cursor_position: Option<(u16, u16)>,
 }
 
 const LABEL: &str = "Match";
@@ -80,7 +80,6 @@ impl Default for MatchWords<'_> {
 			within_input: Input::new(within.into()),
 			include_input: Input::new(include.into()),
 			exclude_input: Input::new(exclude.into()),
-			cursor_position: None,
 			results,
 			word_grid,
 		}
@@ -112,7 +111,7 @@ impl MatchWords<'_> {
 		self.word_grid.update(&self.results);
 	}
 
-	fn render_inputs(&mut self, area: Rect, buf: &mut Buffer) {
+	fn render_inputs(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
 		let [pattern_area, within_area, include_area, exclude_area] =
 			Layout::vertical([Length(1), Length(1), Length(1), Length(1)]).areas(area);
 		let inputs = [
@@ -142,34 +141,33 @@ impl MatchWords<'_> {
 			),
 		];
 
-		self.cursor_position = None;
+		state.cursor_position = None;
 
 		for (input, area, is_active, label) in inputs {
-			Paragraph::new(format!(" {label}: {}", input.value()))
+			let [label_area, input_area] = Layout::horizontal([Length(18), Min(0)]).areas(area);
+
+			Paragraph::new(format!(" {label} "))
+				.style(if is_active {
+					Style::default().fg(tailwind::BLUE.c600).bold()
+				} else {
+					Style::default().dim()
+				})
+				.render(label_area, buf);
+
+			Paragraph::new(input.value())
 				.scroll((0, input.visual_scroll(area.width as usize) as u16))
-				.style(self.input_style(is_active))
-				.render(area, buf);
+				.render(input_area, buf);
 
 			if is_active {
-				let scroll = input.visual_scroll(area.width as usize);
-				let x = input.visual_cursor().max(scroll) - scroll + 1;
+				let scroll = input.visual_scroll(input_area.width as usize);
+				let x = input.visual_cursor().max(scroll);
 
-				self.cursor_position = Some((area.x + x as u16, area.y + 1));
+				state.cursor_position = Some((input_area.x + x as u16, input_area.y));
 			}
 		}
 	}
 
-	fn input_style(&self, is_active: bool) -> Style {
-		if is_active {
-			Style::default()
-				.bg(tailwind::ORANGE.c500)
-				.fg(tailwind::WHITE)
-		} else {
-			Style::default()
-		}
-	}
-
-	fn render_results(&mut self, area: Rect, buf: &mut Buffer) {
+	fn render_results(&self, area: Rect, buf: &mut Buffer) {
 		let block = Block::bordered()
 			.border_set(border::PLAIN)
 			.title(" Results ")
@@ -215,17 +213,15 @@ impl AppTabIo for MatchWords<'_> {
 
 		Ok(())
 	}
-
-	fn get_cursor_position(&self) -> Option<(u16, u16)> {
-		self.cursor_position
-	}
 }
 
-impl Widget for MatchWords<'_> {
-	fn render(mut self, area: Rect, buf: &mut Buffer) {
+impl StatefulWidgetRef for MatchWords<'_> {
+	type State = AppState;
+
+	fn render_ref(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
 		let [inputs_area, results_area] = Layout::vertical([Length(5), Min(0)]).areas(area);
 
-		self.render_inputs(inputs_area, buf);
+		self.render_inputs(inputs_area, buf, state);
 		self.render_results(results_area, buf);
 	}
 }

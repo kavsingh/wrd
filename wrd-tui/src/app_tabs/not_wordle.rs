@@ -3,9 +3,10 @@ use ratatui::buffer::Buffer;
 use ratatui::crossterm::event::{Event, KeyEvent};
 use ratatui::layout::Rect;
 use ratatui::text::Text;
-use ratatui::widgets::{Block, Paragraph, Widget};
+use ratatui::widgets::{Block, Paragraph, StatefulWidgetRef, Widget};
 
 use super::{AppTab, AppTabIo};
+use crate::app::AppState;
 
 #[derive(Default, Debug, Clone)]
 pub struct NotWordle {
@@ -35,14 +36,12 @@ impl AppTabIo for NotWordle {
 			_ => Ok(()),
 		}
 	}
-
-	fn get_cursor_position(&self) -> Option<(u16, u16)> {
-		None
-	}
 }
 
-impl Widget for NotWordle {
-	fn render(self, area: Rect, buf: &mut Buffer) {
+impl StatefulWidgetRef for NotWordle {
+	type State = AppState;
+
+	fn render_ref(&self, area: Rect, buf: &mut Buffer, _state: &mut AppState) {
 		let block = Block::new();
 
 		Paragraph::new(Text::from("Not wordle content"))
