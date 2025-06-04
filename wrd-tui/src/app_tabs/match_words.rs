@@ -1,5 +1,4 @@
 use color_eyre::eyre::Result;
-use crossterm::event::KeyModifiers;
 use ratatui::buffer::Buffer;
 use ratatui::crossterm::event::{Event, KeyCode};
 use ratatui::layout::Constraint::{Length, Min};
@@ -33,16 +32,6 @@ impl TargetInput {
 			TargetInput::Within => TargetInput::Include,
 			TargetInput::Include => TargetInput::Exclude,
 			TargetInput::Exclude => TargetInput::Pattern,
-		}
-	}
-
-	fn previous(&self) -> Self {
-		match &self {
-			TargetInput::None => TargetInput::Exclude,
-			TargetInput::Exclude => TargetInput::Include,
-			TargetInput::Include => TargetInput::Within,
-			TargetInput::Within => TargetInput::Pattern,
-			TargetInput::Pattern => TargetInput::Exclude,
 		}
 	}
 }
@@ -119,25 +108,25 @@ impl MatchWords<'_> {
 				&self.pattern_input,
 				pattern_area,
 				self.target_input == TargetInput::Pattern,
-				"<Ctrl+p> pattern",
+				"<p>attern",
 			),
 			(
 				&self.within_input,
 				within_area,
 				self.target_input == TargetInput::Within,
-				"<Ctrl+w> within",
+				"<w>ithin",
 			),
 			(
 				&self.include_input,
 				include_area,
 				self.target_input == TargetInput::Include,
-				"<Ctrl+i> include",
+				"<i>nclude",
 			),
 			(
 				&self.exclude_input,
 				exclude_area,
 				self.target_input == TargetInput::Exclude,
-				"<Ctrl+w> exclude",
+				"<e>xclude",
 			),
 		];
 
@@ -195,15 +184,13 @@ impl AppTabIo for MatchWords<'_> {
 		}
 
 		if let Event::Key(key_event) = event {
-			let has_ctrl = key_event.modifiers.contains(KeyModifiers::CONTROL);
-			let has_shift = key_event.modifiers.contains(KeyModifiers::SHIFT);
+			let not_focused = self.target_input == TargetInput::None;
 
 			match key_event.code {
-				KeyCode::Char('p') if has_ctrl => self.target_input = TargetInput::Pattern,
-				KeyCode::Char('w') if has_ctrl => self.target_input = TargetInput::Within,
-				KeyCode::Char('i') if has_ctrl => self.target_input = TargetInput::Include,
-				KeyCode::Char('e') if has_ctrl => self.target_input = TargetInput::Exclude,
-				KeyCode::Tab if has_shift => self.target_input = self.target_input.previous(),
+				KeyCode::Char('p') if not_focused => self.target_input = TargetInput::Pattern,
+				KeyCode::Char('w') if not_focused => self.target_input = TargetInput::Within,
+				KeyCode::Char('i') if not_focused => self.target_input = TargetInput::Include,
+				KeyCode::Char('e') if not_focused => self.target_input = TargetInput::Exclude,
 				KeyCode::Tab => self.target_input = self.target_input.next(),
 				KeyCode::Esc => self.target_input = TargetInput::None,
 				KeyCode::Enter => self.refresh_results(),
