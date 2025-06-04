@@ -54,7 +54,8 @@ impl App<'_> {
 
 		while !self.exit {
 			terminal.draw(|frame| self.draw(frame, &mut state))?;
-			self.handle_events().wrap_err("handle events failed")?;
+			self.handle_events(&mut state)
+				.wrap_err("handle events failed")?;
 		}
 		Ok(())
 	}
@@ -67,11 +68,11 @@ impl App<'_> {
 		}
 	}
 
-	fn handle_events(&mut self) -> Result<()> {
+	fn handle_events(&mut self, state: &mut AppState) -> Result<()> {
 		let received_event = event::read()?;
 
 		if let Event::Key(key_event) = received_event {
-			self.handle_key_event(key_event)
+			self.handle_key_event(key_event, state)
 				.wrap_err_with(|| format!("handling key event failed:\n{key_event:#?}"))?;
 		}
 
@@ -92,14 +93,14 @@ impl App<'_> {
 		}
 	}
 
-	fn handle_key_event(&mut self, key_event: KeyEvent) -> Result<()> {
+	fn handle_key_event(&mut self, key_event: KeyEvent, state: &mut AppState) -> Result<()> {
 		match key_event.code {
 			KeyCode::Char('c') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
 				self.exit()
 			}
 			KeyCode::Char(c) => {
 				if let Some(num) = c.to_digit(10) {
-					self.go_to_tab(num as usize);
+					self.go_to_tab(num as usize, state);
 				}
 			}
 			_ => (),
@@ -108,14 +109,16 @@ impl App<'_> {
 		Ok(())
 	}
 
-	fn go_to_tab(&mut self, tab_num: usize) {
+	fn go_to_tab(&mut self, tab_num: usize, state: &mut AppState) {
 		match tab_num {
 			1 => {
+				state.cursor_position = None;
 				self.selected_tab = Tab::MatchWords;
 				self.match_words.set_active(true);
 				self.not_wordle.set_active(false);
 			}
 			2 => {
+				state.cursor_position = None;
 				self.selected_tab = Tab::NotWordle;
 				self.match_words.set_active(false);
 				self.not_wordle.set_active(true);
