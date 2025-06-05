@@ -7,7 +7,7 @@ use ratatui::layout::{Layout, Rect};
 use ratatui::style::Style;
 use ratatui::style::palette::tailwind;
 use ratatui::symbols::border;
-use ratatui::widgets::{Block, Padding, Paragraph, StatefulWidgetRef, Widget};
+use ratatui::widgets::{Block, Padding, Paragraph, StatefulWidgetRef, Widget, WidgetRef};
 use tui_input::Input;
 use tui_input::backend::crossterm::EventHandler;
 
@@ -112,7 +112,7 @@ impl NotWordle<'_> {
 		let grid_area = block.inner(area);
 
 		block.render(area, buf);
-		self.word_grid.clone().render(grid_area, buf);
+		self.word_grid.render_ref(grid_area, buf);
 	}
 }
 

@@ -1,7 +1,7 @@
 use ratatui::buffer::Buffer;
 use ratatui::layout::Constraint::Min;
 use ratatui::layout::Rect;
-use ratatui::widgets::{Row, Table, Widget};
+use ratatui::widgets::{Row, Table, Widget, WidgetRef};
 
 const COLUMNS: usize = 10;
 
@@ -11,7 +11,7 @@ pub struct WordGrid<'a> {
 }
 
 impl WordGrid<'_> {
-	pub fn update(&mut self, words: &Vec<String>) {
+	pub fn update(&mut self, words: &[String]) {
 		self.rows = words
 			.chunks(COLUMNS)
 			.map(|row| Row::new::<Vec<String>>(row.into()))
@@ -19,11 +19,11 @@ impl WordGrid<'_> {
 	}
 }
 
-impl Widget for WordGrid<'_> {
-	fn render(self, area: Rect, buf: &mut Buffer) {
+impl WidgetRef for WordGrid<'_> {
+	fn render_ref(&self, area: Rect, buf: &mut Buffer) {
 		let widths = (0..COLUMNS).map(|_| Min(0));
 
-		Table::new(self.rows, widths)
+		Table::new(self.rows.clone(), widths)
 			.column_spacing(1)
 			.render(area, buf);
 	}

@@ -6,7 +6,7 @@ use ratatui::layout::{Layout, Rect};
 use ratatui::style::Style;
 use ratatui::style::palette::tailwind;
 use ratatui::symbols::border;
-use ratatui::widgets::{Block, Padding, Paragraph, StatefulWidgetRef, Widget};
+use ratatui::widgets::{Block, Padding, Paragraph, StatefulWidgetRef, Widget, WidgetRef};
 use tui_input::Input;
 use tui_input::backend::crossterm::EventHandler;
 
@@ -57,7 +57,7 @@ impl Default for MatchWords<'_> {
 		let within = "trubador";
 		let include = "d";
 		let exclude = "";
-		let results = wrd_lib::match_words(pattern, include, exclude, within, None)
+		let results: Vec<_> = wrd_lib::match_words(pattern, include, exclude, within, None)
 			.unwrap_or_default()
 			.iter()
 			.map(|s| s.to_string())
@@ -167,7 +167,7 @@ impl MatchWords<'_> {
 		let grid_area = block.inner(area);
 
 		block.render(area, buf);
-		self.word_grid.clone().render(grid_area, buf);
+		self.word_grid.render_ref(grid_area, buf);
 	}
 }
 
