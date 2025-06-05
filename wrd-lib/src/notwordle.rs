@@ -329,11 +329,11 @@ mod match_args_tests {
 		assert_eq!(
 			pattern,
 			vec![
-				MatcherToken::ExcludeAllCharsIn("ps".to_string()),
-				MatcherToken::ExcludeAllCharsIn("lt".to_string()),
+				MatcherToken::ExcludeAllCharsIn("pasm".to_string()),
 				MatcherToken::MatchAnyCharIn("a".to_string()),
-				MatcherToken::ExcludeAllCharsIn("tl".to_string()),
-				MatcherToken::ExcludeAllCharsIn("ek".to_string()),
+				MatcherToken::MatchAnyCharIn("t".to_string()),
+				MatcherToken::ExcludeAllCharsIn("toiz".to_string()),
+				MatcherToken::ExcludeAllCharsIn("erna".to_string()),
 			]
 		);
 		assert_eq!(include, "atm".to_string());
