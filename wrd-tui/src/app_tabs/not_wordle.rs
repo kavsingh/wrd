@@ -4,22 +4,40 @@ use ratatui::buffer::Buffer;
 use ratatui::crossterm::event::Event;
 use ratatui::layout::Constraint::{Fill, Length, Min};
 use ratatui::layout::{Layout, Rect};
-use ratatui::style::Style;
 use ratatui::style::palette::tailwind;
+use ratatui::style::{Style, Stylize};
 use ratatui::symbols::border;
+use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Padding, Paragraph, StatefulWidgetRef, Widget, WidgetRef};
 use tui_input::Input;
 use tui_input::backend::crossterm::EventHandler;
+use wrd_lib::GuessResultToken;
 
 use super::{AppTab, AppTabIo};
 use crate::app::AppState;
 use crate::widgets::WordGrid;
 
+#[derive(Debug, Clone)]
+struct GuessResult {
+	input: Input,
+	tokenized: Option<Vec<GuessResultToken>>,
+}
+
+impl Default for GuessResult {
+	fn default() -> Self {
+		Self {
+			input: Input::new("".to_string()),
+			tokenized: None,
+		}
+	}
+}
+
 #[derive(Default, Debug, Clone)]
 pub struct NotWordle<'a> {
-	guess_inputs: Vec<Input>,
+	guesses: Vec<GuessResult>,
 	word_grid: WordGrid<'a>,
 	edit_guess: Option<u16>,
+	results: Vec<String>,
 	is_active: bool,
 }
 
@@ -27,47 +45,44 @@ const LABEL: &str = "Not wordle";
 
 impl NotWordle<'_> {
 	fn add_guess(&mut self) {
-		self.guess_inputs.push(Input::new("".to_string()));
-		self.edit_guess = Some((self.guess_inputs.len() - 1) as u16);
+		self.guesses.push(GuessResult::default());
+		self.edit_guess = Some((self.guesses.len() - 1) as u16);
 	}
 
 	fn refresh_results(&mut self) -> Result<()> {
 		let mut not_wordle = wrd_lib::Notwordle::default();
-		let patterns: Vec<_> = self
-			.guess_inputs
-			.iter()
-			.map(|input| input.value())
-			.collect();
-		let mut results: Vec<String> = vec![];
 
-		for pattern in patterns {
-			let cleaned = pattern.trim();
+		self.results = vec![];
+
+		for guess in self.guesses.iter_mut() {
+			let cleaned = guess.input.value().trim();
 
 			if cleaned.is_empty() {
 				continue;
 			}
 
-			if let Ok((items, _)) = not_wordle.register_guess_result(cleaned) {
-				results = items.iter().map(|s| s.to_string()).collect()
+			if let Ok((items, tokenized)) = not_wordle.register_guess_result(cleaned) {
+				self.results = items.iter().map(|s| s.to_string()).collect();
+				guess.tokenized = Some(tokenized);
 			}
 		}
 
-		self.word_grid.update(&results);
+		self.word_grid.update(&self.results);
 
 		Ok(())
 	}
 
 	fn forward_event_to_input(&mut self, event: &Event) {
-		if let Some(input) = self
+		if let Some(guess) = self
 			.edit_guess
-			.and_then(|i| self.guess_inputs.get_mut(i as usize))
+			.and_then(|i| self.guesses.get_mut(i as usize))
 		{
-			input.handle_event(event);
+			guess.input.handle_event(event);
 		}
 	}
 
 	fn render_inputs(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
-		let areas = Layout::vertical(vec![Length(1); self.guess_inputs.len() + 1]).split(area);
+		let areas = Layout::vertical(vec![Length(1); self.guesses.len() + 1]).split(area);
 		let (intro, inputs) = areas.split_at_checked(1).unwrap_or_default();
 
 		if let Some(intro_area) = intro.first() {
@@ -77,10 +92,10 @@ impl NotWordle<'_> {
 		}
 
 		for (index, layout_area) in inputs.iter().enumerate() {
-			if let Some(input) = self.guess_inputs.get(index) {
+			if let Some(guess) = self.guesses.get(index) {
 				let is_active = self.edit_guess.map(|v| v == index as u16).unwrap_or(false);
-				let [label_area, input_area] =
-					Layout::horizontal([Length(5), Min(0)]).areas(*layout_area);
+				let [label_area, input_area, formatted_area] =
+					Layout::horizontal([Length(5), Length(16), Min(20)]).areas(*layout_area);
 
 				Paragraph::new(format!(" <{}>", index_to_char(index as u16)))
 					.style(if is_active {
@@ -90,13 +105,22 @@ impl NotWordle<'_> {
 					})
 					.render(label_area, buf);
 
-				Paragraph::new(input.value())
-					.scroll((0, input.visual_scroll(area.width as usize) as u16))
+				Paragraph::new(guess.input.value())
+					.scroll((
+						0,
+						guess.input.visual_scroll(input_area.width as usize) as u16,
+					))
 					.render(input_area, buf);
 
+				if let Some(tokenized) = &guess.tokenized {
+					let formatted = format_tokenized(tokenized);
+
+					Paragraph::new(Line::from(formatted)).render(formatted_area, buf);
+				}
+
 				if is_active {
-					let scroll = input.visual_scroll(input_area.width as usize);
-					let x = input.visual_cursor().max(scroll);
+					let scroll = guess.input.visual_scroll(input_area.width as usize);
+					let x = guess.input.visual_cursor().max(scroll);
 
 					state.cursor_position = Some((input_area.x + x as u16, input_area.y));
 				}
@@ -104,16 +128,63 @@ impl NotWordle<'_> {
 		}
 	}
 
+	fn commit_guess(&mut self) {
+		self.refresh_results().unwrap_or(());
+
+		if let Some(index) = self.edit_guess {
+			if index == (self.guesses.len() as u16) - 1 {
+				self.add_guess();
+			} else {
+				self.go_to_next_guess();
+			}
+		}
+	}
+
+	fn go_to_next_guess(&mut self) {
+		match self.edit_guess {
+			None => self.edit_guess = Some(0),
+			Some(current) => {
+				let next = (current + 1) % self.guesses.len() as u16;
+
+				self.edit_guess = Some(next);
+			}
+		}
+	}
+
 	fn render_results(&self, area: Rect, buf: &mut Buffer) {
+		let title = if self.guesses.is_empty() {
+			" Enter a guess result ".to_string()
+		} else {
+			format!(" {} words remaining ", self.results.len())
+		};
+
 		let block = Block::bordered()
 			.border_set(border::PLAIN)
-			.title(" Results ")
+			.title(title)
 			.padding(Padding::horizontal(1));
 		let grid_area = block.inner(area);
 
 		block.render(area, buf);
 		self.word_grid.render_ref(grid_area, buf);
 	}
+}
+
+fn format_tokenized(tokenized: &[GuessResultToken]) -> Vec<Span> {
+	tokenized
+		.iter()
+		.cloned()
+		.map(|token| match token {
+			GuessResultToken::Right(c) => Span::from(format!(" {c} "))
+				.bg(tailwind::ORANGE.c400)
+				.fg(tailwind::WHITE)
+				.bold(),
+			GuessResultToken::WrongPosition(c) => Span::from(format!(" {c} "))
+				.bg(tailwind::BLUE.c400)
+				.fg(tailwind::WHITE)
+				.bold(),
+			GuessResultToken::Wrong(c) => Span::from(format!(" {c} ")).dim(),
+		})
+		.collect()
 }
 
 // a = ascii 97
@@ -151,20 +222,13 @@ impl AppTabIo for NotWordle<'_> {
 			match key_event.code {
 				KeyCode::Char('+') if !is_editing => self.add_guess(),
 				KeyCode::Esc => self.edit_guess = None,
-				KeyCode::Enter => self.refresh_results().unwrap_or(()),
-				KeyCode::Tab => match self.edit_guess {
-					None => self.edit_guess = Some(0),
-					Some(current) => {
-						let next = (current + 1) % self.guess_inputs.len() as u16;
-
-						self.edit_guess = Some(next);
-					}
-				},
+				KeyCode::Enter if is_editing => self.commit_guess(),
+				KeyCode::Tab => self.go_to_next_guess(),
 				KeyCode::Char(c) if !is_editing => {
 					let target_index = char_to_index(c);
 
 					if let Some(index) = target_index {
-						if index < self.guess_inputs.len() as u16 {
+						if index < self.guesses.len() as u16 {
 							self.edit_guess = Some(index);
 						};
 					}
@@ -183,7 +247,7 @@ impl StatefulWidgetRef for NotWordle<'_> {
 
 	fn render_ref(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
 		let [inputs_area, results_area] =
-			Layout::vertical([Length(self.guess_inputs.len() as u16 + 1), Fill(1)]).areas(area);
+			Layout::vertical([Length(self.guesses.len() as u16 + 1), Fill(1)]).areas(area);
 
 		self.render_inputs(inputs_area, buf, state);
 		self.render_results(results_area, buf);
