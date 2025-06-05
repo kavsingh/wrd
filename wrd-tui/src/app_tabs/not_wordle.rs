@@ -18,7 +18,6 @@ use crate::widgets::WordGrid;
 #[derive(Default, Debug, Clone)]
 pub struct NotWordle<'a> {
 	guess_inputs: Vec<Input>,
-	results: Vec<&'static str>,
 	word_grid: WordGrid<'a>,
 	edit_guess: Option<u16>,
 	is_active: bool,
@@ -32,8 +31,24 @@ impl NotWordle<'_> {
 		self.edit_guess = Some((self.guess_inputs.len() - 1) as u16);
 	}
 
-	fn refresh_results(&mut self) {
-		self.word_grid.update(&self.results);
+	fn refresh_results(&mut self) -> Result<()> {
+		let mut not_wordle = wrd_lib::Notwordle::default();
+		let patterns: Vec<_> = self
+			.guess_inputs
+			.iter()
+			.map(|input| input.value())
+			.collect();
+		let mut results: Vec<String> = vec![];
+
+		for pattern in patterns {
+			if let Ok((items, _)) = not_wordle.register_guess_result(pattern) {
+				results = items.iter().map(|s| s.to_string()).collect()
+			}
+		}
+
+		self.word_grid.update(&results);
+
+		Ok(())
 	}
 
 	fn forward_event_to_input(&mut self, event: &Event) {
@@ -130,7 +145,7 @@ impl AppTabIo for NotWordle<'_> {
 			match key_event.code {
 				KeyCode::Char('+') if !is_editing => self.add_guess(),
 				KeyCode::Esc => self.edit_guess = None,
-				KeyCode::Enter => self.refresh_results(),
+				KeyCode::Enter => self.refresh_results().unwrap_or(()),
 				KeyCode::Tab => match self.edit_guess {
 					None => self.edit_guess = Some(0),
 					Some(current) => {

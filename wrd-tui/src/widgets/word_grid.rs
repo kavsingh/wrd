@@ -11,10 +11,10 @@ pub struct WordGrid<'a> {
 }
 
 impl WordGrid<'_> {
-	pub fn update(&mut self, words: &Vec<&'static str>) {
+	pub fn update(&mut self, words: &Vec<String>) {
 		self.rows = words
 			.chunks(COLUMNS)
-			.map(|row| Row::new::<Vec<&str>>(row.into()))
+			.map(|row| Row::new::<Vec<String>>(row.into()))
 			.collect();
 	}
 }

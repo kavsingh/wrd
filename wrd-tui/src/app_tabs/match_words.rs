@@ -44,7 +44,7 @@ pub struct MatchWords<'a> {
 	within_input: Input,
 	include_input: Input,
 	exclude_input: Input,
-	results: Vec<&'static str>,
+	results: Vec<String>,
 	word_grid: WordGrid<'a>,
 }
 
@@ -57,8 +57,11 @@ impl Default for MatchWords<'_> {
 		let within = "trubador";
 		let include = "d";
 		let exclude = "";
-		let results =
-			wrd_lib::match_words(pattern, include, exclude, within, None).unwrap_or_default();
+		let results = wrd_lib::match_words(pattern, include, exclude, within, None)
+			.unwrap_or_default()
+			.iter()
+			.map(|s| s.to_string())
+			.collect();
 
 		word_grid.update(&results);
 
@@ -96,7 +99,7 @@ impl MatchWords<'_> {
 		)
 		.unwrap_or_default();
 
-		self.results = results;
+		self.results = results.iter().map(|s| s.to_string()).collect();
 		self.word_grid.update(&self.results);
 	}
 
