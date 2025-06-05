@@ -1,0 +1,14 @@
+[package]
+name = "wrd-tui"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+color-eyre = "0.6.5"
+crossterm = "0.29.0"
+ratatui = { version = "0.30.0-alpha.4", features = [
+    "all-widgets",
+    "unstable-widget-ref",
+] }
+tui-input = "0.12.1"
+wrd-lib = { path = "../wrd-lib" }
