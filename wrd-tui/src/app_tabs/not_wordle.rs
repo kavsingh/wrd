@@ -58,10 +58,11 @@ impl NotWordle<'_> {
 			let cleaned = guess.input.value().trim();
 
 			if cleaned.is_empty() {
+				guess.tokenized = None;
 				continue;
 			}
 
-			if let Ok((items, tokenized)) = not_wordle.register_guess_result(cleaned) {
+			if let Ok((items, tokenized)) = not_wordle.register_guess_result(cleaned, None) {
 				self.results = items.iter().map(|s| s.to_string()).collect();
 				guess.tokenized = Some(tokenized);
 			}
@@ -116,6 +117,8 @@ impl NotWordle<'_> {
 					let formatted = format_tokenized(tokenized);
 
 					Paragraph::new(Line::from(formatted)).render(formatted_area, buf);
+				} else {
+					Paragraph::new("").render(formatted_area, buf);
 				}
 
 				if is_active {
