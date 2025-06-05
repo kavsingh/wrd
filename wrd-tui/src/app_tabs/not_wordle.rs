@@ -131,6 +131,14 @@ impl AppTabIo for NotWordle<'_> {
 				KeyCode::Char('+') if !is_editing => self.add_guess(),
 				KeyCode::Esc => self.edit_guess = None,
 				KeyCode::Enter => self.refresh_results(),
+				KeyCode::Tab => match self.edit_guess {
+					None => self.edit_guess = Some(0),
+					Some(current) => {
+						let next = (current + 1) % self.guess_inputs.len() as u16;
+
+						self.edit_guess = Some(next);
+					}
+				},
 				KeyCode::Char(c) if !is_editing => {
 					let target_index = char_to_index(c);
 
