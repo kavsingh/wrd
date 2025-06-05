@@ -1,7 +1,7 @@
 use color_eyre::eyre::Result;
 use ratatui::buffer::Buffer;
 use ratatui::crossterm::event::{Event, KeyCode};
-use ratatui::layout::Constraint::{Length, Min};
+use ratatui::layout::Constraint::{Fill, Length, Min};
 use ratatui::layout::{Layout, Rect};
 use ratatui::style::Style;
 use ratatui::style::palette::tailwind;
@@ -206,7 +206,7 @@ impl StatefulWidgetRef for MatchWords<'_> {
 	type State = AppState;
 
 	fn render_ref(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
-		let [inputs_area, results_area] = Layout::vertical([Length(5), Min(0)]).areas(area);
+		let [inputs_area, results_area] = Layout::vertical([Length(4), Fill(1)]).areas(area);
 
 		self.render_inputs(inputs_area, buf, state);
 		self.render_results(results_area, buf);

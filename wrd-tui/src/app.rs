@@ -23,7 +23,7 @@ enum Tab {
 #[derive(Debug)]
 pub struct App<'a> {
 	match_words: MatchWords<'a>,
-	not_wordle: NotWordle,
+	not_wordle: NotWordle<'a>,
 	selected_tab: Tab,
 	exit: bool,
 }
