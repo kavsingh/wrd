@@ -22,7 +22,7 @@ pub fn notwordle_runner(guess_results: &str) -> Result<(), Box<dyn Error>> {
 	let mut print_items: Vec<&str> = vec![];
 
 	for result in results {
-		let (items, parsed_result) = notwordle.register_guess_result(result)?;
+		let (items, parsed_result) = notwordle.register_guess_result(result, None)?;
 
 		println!(
 			"{} remaining after {}",

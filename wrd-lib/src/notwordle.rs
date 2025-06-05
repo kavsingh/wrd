@@ -32,6 +32,7 @@ impl Notwordle {
 	pub fn register_guess_result(
 		&mut self,
 		result: &str,
+		words: Option<&[&'static str]>,
 	) -> Result<(Vec<&str>, Vec<GuessResultToken>), String> {
 		let new_result = tokenize_guess_result(result)?;
 
@@ -49,7 +50,7 @@ impl Notwordle {
 		self.guess_results.push(new_result.clone());
 
 		let (tokens, include, exclude) = get_match_args_from_results(&self.guess_results);
-		let matches = match_words_from_tokens(&tokens, &include, &exclude, "", None)?;
+		let matches = match_words_from_tokens(&tokens, &include, &exclude, "", words)?;
 
 		Ok((matches, new_result))
 	}
@@ -97,7 +98,9 @@ fn get_match_args_from_results(
 					include.push_str(c);
 				}
 				GuessResultToken::Wrong(c) => {
-					exclude.push_str(c);
+					if !include.contains(c) {
+						exclude.push_str(c);
+					}
 				}
 			}
 
@@ -284,6 +287,82 @@ mod match_args_tests {
 		);
 		assert_eq!(include, "lat".to_string());
 		assert_eq!(exclude, "pesk".to_string());
+
+		//
+
+		let guesses = [
+			// !p !l ?a ?t !e
+			vec![
+				GuessResultToken::Wrong("p".to_string()),
+				GuessResultToken::Wrong("l".to_string()),
+				GuessResultToken::WrongPosition("a".to_string()),
+				GuessResultToken::WrongPosition("t".to_string()),
+				GuessResultToken::Wrong("e".to_string()),
+			],
+			// ?a !c t !o !r
+			vec![
+				GuessResultToken::WrongPosition("a".to_string()),
+				GuessResultToken::Wrong("c".to_string()),
+				GuessResultToken::Right("t".to_string()),
+				GuessResultToken::Wrong("o".to_string()),
+				GuessResultToken::Wrong("r".to_string()),
+			],
+			// !s a t !i !n
+			vec![
+				GuessResultToken::Wrong("s".to_string()),
+				GuessResultToken::Right("a".to_string()),
+				GuessResultToken::Right("t".to_string()),
+				GuessResultToken::Wrong("i".to_string()),
+				GuessResultToken::Wrong("n".to_string()),
+			],
+			// ?m a t !z !a
+			vec![
+				GuessResultToken::WrongPosition("m".to_string()),
+				GuessResultToken::Right("a".to_string()),
+				GuessResultToken::Right("t".to_string()),
+				GuessResultToken::Wrong("z".to_string()),
+				GuessResultToken::Wrong("a".to_string()),
+			],
+		];
+		let (pattern, include, exclude) = get_match_args_from_results(&guesses);
+
+		assert_eq!(
+			pattern,
+			vec![
+				MatcherToken::ExcludeAllCharsIn("ps".to_string()),
+				MatcherToken::ExcludeAllCharsIn("lt".to_string()),
+				MatcherToken::MatchAnyCharIn("a".to_string()),
+				MatcherToken::ExcludeAllCharsIn("tl".to_string()),
+				MatcherToken::ExcludeAllCharsIn("ek".to_string()),
+			]
+		);
+		assert_eq!(include, "atm".to_string());
+		assert_eq!(exclude, "plecorsinz".to_string());
+
+		Ok(())
+	}
+
+	#[test]
+	fn should_refine_words() -> Result<(), String> {
+		let mut nw = Notwordle::default();
+		let words = ["plate", "pastor", "panda", "datum"];
+		let guesses = [
+			"!p !l ?a ?t !e",
+			"?a !c t !o !r",
+			"!s a t !i !n",
+			"?m a t !z !a",
+		];
+
+		let mut result: Vec<&str> = vec![];
+		let expected = "datum";
+
+		for guess in guesses {
+			let (items, _) = nw.register_guess_result(guess, Some(&words)).unwrap();
+
+			result = items
+		}
+
+		assert_eq!(result, vec![expected]);
 
 		Ok(())
 	}
