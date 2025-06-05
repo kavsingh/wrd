@@ -41,7 +41,13 @@ impl NotWordle<'_> {
 		let mut results: Vec<String> = vec![];
 
 		for pattern in patterns {
-			if let Ok((items, _)) = not_wordle.register_guess_result(pattern) {
+			let cleaned = pattern.trim();
+
+			if cleaned.is_empty() {
+				continue;
+			}
+
+			if let Ok((items, _)) = not_wordle.register_guess_result(cleaned) {
 				results = items.iter().map(|s| s.to_string()).collect()
 			}
 		}
