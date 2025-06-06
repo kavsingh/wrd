@@ -52,25 +52,22 @@ impl NotWordle<'_> {
 	fn refresh_results(&mut self) -> Result<()> {
 		let mut not_wordle = wrd_lib::Notwordle::default();
 
-		self.results = vec![];
-
 		for guess in self.guesses.iter_mut() {
-			let cleaned = guess.input.value().trim();
-
-			if cleaned.is_empty() {
-				guess.tokenized = None;
-				continue;
-			}
-
-			if let Ok((items, tokenized)) = not_wordle.register_guess_result(cleaned, None) {
-				self.results = items.iter().map(|s| s.to_string()).collect();
-				guess.tokenized = Some(tokenized);
-			}
+			guess.tokenized = not_wordle
+				.register_guess_result(guess.input.value().trim())
+				.ok()
 		}
 
-		self.word_grid.update(&self.results);
+		match not_wordle.refine(None) {
+			Ok(results) => {
+				self.results = results.iter().map(|s| s.to_string()).collect();
+				self.word_grid.update(&self.results);
 
-		Ok(())
+				Ok(())
+			}
+			// @TODO: surface error
+			Err(_) => Ok(()),
+		}
 	}
 
 	fn forward_event_to_input(&mut self, event: &Event) {

@@ -22,14 +22,15 @@ pub fn notwordle_runner(guess_results: &str) -> Result<(), Box<dyn Error>> {
 	let mut print_items: Vec<&str> = vec![];
 
 	for result in results {
-		let (items, parsed_result) = notwordle.register_guess_result(result, None)?;
+		let tokenized = notwordle.register_guess_result(result)?;
+		let refined = notwordle.refine(None)?;
 
 		println!(
 			"{} remaining after {}",
-			items.len(),
-			format_notwordle_guess_result(&parsed_result)
+			refined.len(),
+			format_notwordle_guess_result(&tokenized)
 		);
-		print_items = items;
+		print_items = refined;
 	}
 
 	println!("{}", format_word_grid(&print_items));

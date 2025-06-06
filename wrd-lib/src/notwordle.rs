@@ -29,16 +29,12 @@ impl PartialEq for GuessResultToken {
 }
 
 impl Notwordle {
-	pub fn register_guess_result(
-		&mut self,
-		result: &str,
-		words: Option<&[&'static str]>,
-	) -> Result<(Vec<&str>, Vec<GuessResultToken>), String> {
-		let new_result = tokenize_guess_result(result)?;
+	pub fn register_guess_result(&mut self, result: &str) -> Result<Vec<GuessResultToken>, String> {
+		let tokenized = tokenize_guess_result(result)?;
 
 		if let Some(stored) = self.guess_results.last() {
 			let stored_len = stored.len();
-			let new_len = new_result.len();
+			let new_len = tokenized.len();
 
 			if stored_len != new_len {
 				return Err(format!(
@@ -47,12 +43,15 @@ impl Notwordle {
 			}
 		}
 
-		self.guess_results.push(new_result.clone());
+		self.guess_results.push(tokenized.clone());
 
+		Ok(tokenized)
+	}
+
+	pub fn refine(&self, words: Option<&[&'static str]>) -> Result<Vec<&str>, String> {
 		let (tokens, include, exclude) = get_match_args_from_results(&self.guess_results);
-		let matches = match_words_from_tokens(&tokens, &include, &exclude, "", words)?;
 
-		Ok((matches, new_result))
+		match_words_from_tokens(&tokens, &include, &exclude, "", words)
 	}
 }
 
@@ -346,23 +345,13 @@ mod match_args_tests {
 	fn should_refine_words() -> Result<(), String> {
 		let mut nw = Notwordle::default();
 		let words = ["plate", "pastor", "panda", "datum"];
-		let guesses = [
-			"!p !l ?a ?t !e",
-			"?a !c t !o !r",
-			"!s a t !i !n",
-			"?m a t !z !a",
-		];
 
-		let mut result: Vec<&str> = vec![];
-		let expected = "datum";
+		nw.register_guess_result("!p !l ?a ?t !e").unwrap();
+		nw.register_guess_result("?a !c t !o !r").unwrap();
+		nw.register_guess_result("!s a t !i !n").unwrap();
+		nw.register_guess_result("?m a t !z !a").unwrap();
 
-		for guess in guesses {
-			let (items, _) = nw.register_guess_result(guess, Some(&words)).unwrap();
-
-			result = items
-		}
-
-		assert_eq!(result, vec![expected]);
+		assert_eq!(nw.refine(Some(&words)).unwrap(), vec!["datum"]);
 
 		Ok(())
 	}
