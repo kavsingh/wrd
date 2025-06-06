@@ -2,7 +2,7 @@ use std::sync::LazyLock;
 
 use fancy_regex::Regex;
 
-use crate::data::WORDS;
+use crate::data::{Dictionary, get_dictionary};
 use crate::util::non_empty_str;
 
 #[derive(Clone, Debug)]
@@ -34,10 +34,10 @@ pub fn match_words<'a>(
 	include: &str,
 	exclude: &str,
 	within: &str,
-	words: Option<&[&'a str]>,
+	haystack: Option<&[&'a str]>,
 ) -> Result<Vec<&'a str>, String> {
 	let tokens = tokenize_pattern(pattern)?;
-	let result = match_words_from_tokens(&tokens, include, exclude, within, words)?;
+	let result = match_words_from_tokens(&tokens, include, exclude, within, haystack)?;
 
 	Ok(result)
 }
@@ -47,11 +47,11 @@ pub fn match_words_from_tokens<'a>(
 	include: &str,
 	exclude: &str,
 	within: &str,
-	words: Option<&[&'a str]>,
+	haystack: Option<&[&'a str]>,
 ) -> Result<Vec<&'a str>, String> {
 	let regex = regex_from_tokens(tokens)?;
-	let result: Vec<&str> = words
-		.unwrap_or_else(|| &WORDS)
+	let result: Vec<&str> = haystack
+		.unwrap_or_else(|| get_dictionary(Dictionary::Moby))
 		.iter()
 		.filter(|word| match_word(word, &regex, include, exclude, within).unwrap_or(false))
 		.cloned()
