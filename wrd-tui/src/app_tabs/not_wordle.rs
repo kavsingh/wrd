@@ -11,13 +11,13 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Padding, Paragraph, StatefulWidgetRef, Widget, WidgetRef};
 use tui_input::Input;
 use tui_input::backend::crossterm::EventHandler;
-use wrd_lib::GuessResultToken;
+use wrd_lib::{GuessResultToken, get_dictionary};
 
-use super::{AppTab, AppTabIo};
+use super::{AppTab, AppTabIo, Tab};
 use crate::app::AppState;
 use crate::widgets::WordGrid;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct GuessResult {
 	input: Input,
 	tokenized: Option<Vec<GuessResultToken>>,
@@ -32,7 +32,7 @@ impl Default for GuessResult {
 	}
 }
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug)]
 pub struct NotWordle<'a> {
 	guesses: Vec<GuessResult>,
 	word_grid: WordGrid<'a>,
@@ -41,15 +41,13 @@ pub struct NotWordle<'a> {
 	is_active: bool,
 }
 
-const LABEL: &str = "Not wordle";
-
 impl NotWordle<'_> {
 	fn add_guess(&mut self) {
 		self.guesses.push(GuessResult::default());
 		self.edit_guess = Some((self.guesses.len() - 1) as u16);
 	}
 
-	fn refresh_results(&mut self) -> Result<()> {
+	fn refresh_results(&mut self, state: &AppState) -> Result<()> {
 		let mut not_wordle = wrd_lib::Notwordle::default();
 
 		for guess in self.guesses.iter_mut() {
@@ -58,7 +56,7 @@ impl NotWordle<'_> {
 				.ok()
 		}
 
-		match not_wordle.refine(None) {
+		match not_wordle.refine(Some(get_dictionary(&state.dictionary))) {
 			Ok(results) => {
 				self.results = results.iter().map(|s| s.to_string()).collect();
 				self.word_grid.update(&self.results);
@@ -128,8 +126,8 @@ impl NotWordle<'_> {
 		}
 	}
 
-	fn commit_guess(&mut self) {
-		self.refresh_results().unwrap_or(());
+	fn commit_guess(&mut self, state: &AppState) {
+		self.refresh_results(state).unwrap_or(());
 
 		if let Some(index) = self.edit_guess {
 			if index == (self.guesses.len() as u16) - 1 {
@@ -204,14 +202,18 @@ fn char_to_index(ch: char) -> Option<u16> {
 
 impl AppTabIo for NotWordle<'_> {
 	fn label(&self) -> &'static str {
-		LABEL
+		"Not wordle"
 	}
 
-	fn set_active(&mut self, is_active: bool) {
+	fn tab(&self) -> Tab {
+		Tab::NotWordle
+	}
+
+	fn set_active(&mut self, is_active: bool, _: &mut AppState) {
 		self.is_active = is_active
 	}
 
-	fn handle_event(&mut self, event: &Event) -> Result<()> {
+	fn handle_event(&mut self, event: &Event, state: &mut AppState) -> Result<()> {
 		if !self.is_active {
 			return Ok(());
 		}
@@ -222,7 +224,7 @@ impl AppTabIo for NotWordle<'_> {
 			match key_event.code {
 				KeyCode::Char('+') if !is_editing => self.add_guess(),
 				KeyCode::Esc => self.edit_guess = None,
-				KeyCode::Enter if is_editing => self.commit_guess(),
+				KeyCode::Enter if is_editing => self.commit_guess(state),
 				KeyCode::Tab => self.go_to_next_guess(),
 				KeyCode::Char(c) if !is_editing => {
 					let target_index = char_to_index(c);

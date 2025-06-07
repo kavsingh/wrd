@@ -9,8 +9,9 @@ use ratatui::symbols::border;
 use ratatui::widgets::{Block, Padding, Paragraph, StatefulWidgetRef, Widget, WidgetRef};
 use tui_input::Input;
 use tui_input::backend::crossterm::EventHandler;
+use wrd_lib::get_dictionary;
 
-use super::{AppTab, AppTabIo};
+use super::{AppTab, AppTabIo, Tab};
 use crate::app::AppState;
 use crate::widgets::WordGrid;
 
@@ -36,7 +37,7 @@ impl TargetInput {
 	}
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct MatchWords<'a> {
 	is_active: bool,
 	target_input: TargetInput,
@@ -47,8 +48,6 @@ pub struct MatchWords<'a> {
 	results: Vec<String>,
 	word_grid: WordGrid<'a>,
 }
-
-const LABEL: &str = "Match";
 
 impl Default for MatchWords<'_> {
 	fn default() -> Self {
@@ -89,13 +88,13 @@ impl MatchWords<'_> {
 		};
 	}
 
-	fn refresh_results(&mut self) {
+	fn refresh_results(&mut self, state: &AppState) {
 		let results = wrd_lib::match_words(
 			self.pattern_input.value(),
 			self.include_input.value(),
 			self.exclude_input.value(),
 			self.within_input.value(),
-			None,
+			Some(get_dictionary(&state.dictionary)),
 		)
 		.unwrap_or_default();
 
@@ -173,15 +172,19 @@ impl MatchWords<'_> {
 
 impl AppTabIo for MatchWords<'_> {
 	fn label(&self) -> &'static str {
-		LABEL
+		"Match"
 	}
 
-	fn set_active(&mut self, is_active: bool) {
+	fn tab(&self) -> Tab {
+		Tab::MatchWords
+	}
+
+	fn set_active(&mut self, is_active: bool, _: &mut AppState) {
 		self.is_active = is_active;
 		self.target_input = TargetInput::default();
 	}
 
-	fn handle_event(&mut self, event: &Event) -> Result<()> {
+	fn handle_event(&mut self, event: &Event, state: &mut AppState) -> Result<()> {
 		if !self.is_active {
 			return Ok(());
 		}
@@ -196,7 +199,7 @@ impl AppTabIo for MatchWords<'_> {
 				KeyCode::Char('e') if not_focused => self.target_input = TargetInput::Exclude,
 				KeyCode::Tab => self.target_input = self.target_input.next(),
 				KeyCode::Esc => self.target_input = TargetInput::None,
-				KeyCode::Enter => self.refresh_results(),
+				KeyCode::Enter => self.refresh_results(state),
 				_ => self.forward_event_to_input(event),
 			}
 		};

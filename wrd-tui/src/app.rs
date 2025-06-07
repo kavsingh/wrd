@@ -10,40 +10,30 @@ use ratatui::symbols::border;
 use ratatui::text::Line;
 use ratatui::widgets::{Block, Paragraph, StatefulWidget, StatefulWidgetRef, Tabs, Widget};
 use ratatui::{DefaultTerminal, Frame};
+use wrd_lib::Dictionary;
 
-use crate::app_tabs::{AppTab, AppTabIo, MatchWords, NotWordle};
-
-#[derive(Debug, Default)]
-enum Tab {
-	#[default]
-	MatchWords,
-	NotWordle,
-}
+use crate::app_tabs::{AppTab, AppTabIo, MatchWords, NotWordle, Settings, Tab};
 
 #[derive(Debug)]
+pub struct AppState {
+	pub dictionary: Dictionary,
+	pub cursor_position: Option<(u16, u16)>,
+}
+
+#[derive(Default, Debug)]
 pub struct App<'a> {
 	match_words: MatchWords<'a>,
 	not_wordle: NotWordle<'a>,
+	settings: Settings,
 	selected_tab: Tab,
 	exit: bool,
 }
 
-#[derive(Default, Debug)]
-pub struct AppState {
-	pub cursor_position: Option<(u16, u16)>,
-}
-
-impl Default for App<'_> {
+impl Default for AppState {
 	fn default() -> Self {
-		let mut match_words = MatchWords::default();
-
-		match_words.set_active(true);
-
 		Self {
-			match_words,
-			not_wordle: NotWordle::default(),
-			selected_tab: Tab::default(),
-			exit: false,
+			dictionary: Dictionary::Moby,
+			cursor_position: None,
 		}
 	}
 }
@@ -51,6 +41,8 @@ impl Default for App<'_> {
 impl App<'_> {
 	pub fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
 		let mut state = AppState::default();
+
+		self.match_words.set_active(true, &mut state);
 
 		while !self.exit {
 			terminal.draw(|frame| self.draw(frame, &mut state))?;
@@ -77,11 +69,14 @@ impl App<'_> {
 		}
 
 		self.match_words
-			.handle_event(&received_event)
+			.handle_event(&received_event, state)
 			.wrap_err("match words: handle events failed")?;
 		self.not_wordle
-			.handle_event(&received_event)
+			.handle_event(&received_event, state)
 			.wrap_err("not wordle: handle events failed")?;
+		self.settings
+			.handle_event(&received_event, state)
+			.wrap_err("settings: handle events failed")?;
 
 		Ok(())
 	}
@@ -90,6 +85,7 @@ impl App<'_> {
 		match self.selected_tab {
 			Tab::MatchWords => &self.match_words,
 			Tab::NotWordle => &self.not_wordle,
+			Tab::Settings => &self.settings,
 		}
 	}
 
@@ -114,28 +110,42 @@ impl App<'_> {
 			1 => {
 				state.cursor_position = None;
 				self.selected_tab = Tab::MatchWords;
-				self.match_words.set_active(true);
-				self.not_wordle.set_active(false);
+				self.match_words.set_active(true, state);
+				self.not_wordle.set_active(false, state);
+				self.settings.set_active(false, state);
 			}
 			2 => {
 				state.cursor_position = None;
 				self.selected_tab = Tab::NotWordle;
-				self.match_words.set_active(false);
-				self.not_wordle.set_active(true);
+				self.match_words.set_active(false, state);
+				self.not_wordle.set_active(true, state);
+				self.settings.set_active(false, state);
+			}
+			3 => {
+				state.cursor_position = None;
+				self.selected_tab = Tab::Settings;
+				self.match_words.set_active(false, state);
+				self.not_wordle.set_active(false, state);
+				self.settings.set_active(true, state);
 			}
 			_ => (),
 		}
 	}
 
 	fn render_header(&self, area: Rect, buf: &mut Buffer) {
-		let labels = vec![self.match_words.label(), self.not_wordle.label()]
-			.into_iter()
-			.enumerate()
-			.map(|(i, label)| format!(" {label} ({}) ", i + 1));
+		let labels = vec![
+			self.match_words.label(),
+			self.not_wordle.label(),
+			self.settings.label(),
+		]
+		.into_iter()
+		.enumerate()
+		.map(|(i, label)| format!(" {label} ({}) ", i + 1));
 		let highlight_style = (Color::default(), tailwind::BLUE.c700);
 		let selected_tab_index = match &self.selected_tab {
 			Tab::MatchWords => 0,
 			Tab::NotWordle => 1,
+			Tab::Settings => 2,
 		};
 		let block = Block::bordered()
 			.title(Line::from(" WRD ".bold()))
@@ -175,6 +185,7 @@ impl App<'_> {
 		match self.selected_tab {
 			Tab::MatchWords => self.match_words.render_ref(content_area, buf, state),
 			Tab::NotWordle => self.not_wordle.render_ref(content_area, buf, state),
+			Tab::Settings => self.settings.render_ref(content_area, buf, state),
 		}
 
 		block.render(area, buf);

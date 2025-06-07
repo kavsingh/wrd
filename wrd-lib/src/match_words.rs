@@ -51,7 +51,7 @@ pub fn match_words_from_tokens<'a>(
 ) -> Result<Vec<&'a str>, String> {
 	let regex = regex_from_tokens(tokens)?;
 	let result: Vec<&str> = haystack
-		.unwrap_or_else(|| get_dictionary(Dictionary::Moby))
+		.unwrap_or_else(|| get_dictionary(&Dictionary::Moby))
 		.iter()
 		.filter(|word| match_word(word, &regex, include, exclude, within).unwrap_or(false))
 		.cloned()

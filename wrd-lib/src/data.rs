@@ -18,13 +18,14 @@ static DICT_DATA: LazyLock<HashMap<&'static str, Cow<'static, [u8]>>> =
 static DICTIONARIES: LazyLock<HashMap<&'static str, Vec<&'static str>>> =
 	LazyLock::new(parse_dict_data);
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum Dictionary {
 	Moby,
 	Gwicks,
 }
 
 impl Dictionary {
-	fn name(&self) -> &'static str {
+	pub fn name(&self) -> &'static str {
 		match *self {
 			Self::Moby => "moby",
 			Self::Gwicks => "gwicks",
@@ -39,7 +40,7 @@ impl Dictionary {
 	}
 }
 
-pub fn get_dictionary(dict: Dictionary) -> &'static Vec<&'static str> {
+pub fn get_dictionary(dict: &Dictionary) -> &'static Vec<&'static str> {
 	let name = dict.name();
 
 	DICTIONARIES
