@@ -9,7 +9,7 @@ use ratatui::widgets::{Block, Padding, Paragraph, StatefulWidgetRef, Widget};
 use wrd_lib::Dictionary;
 
 use super::{AppTab, AppTabIo, Tab};
-use crate::app::AppState;
+use crate::state::AppState;
 
 #[derive(Debug)]
 pub struct Settings {

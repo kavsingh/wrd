@@ -10,7 +10,7 @@ pub use match_words::MatchWords;
 pub use not_wordle::NotWordle;
 pub use settings::Settings;
 
-use crate::app::AppState;
+use crate::state::AppState;
 
 #[derive(Debug, Default)]
 pub enum Tab {

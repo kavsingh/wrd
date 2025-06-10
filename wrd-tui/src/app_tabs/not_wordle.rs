@@ -14,7 +14,7 @@ use tui_input::backend::crossterm::EventHandler;
 use wrd_lib::{GuessResultToken, get_dictionary};
 
 use super::{AppTab, AppTabIo, Tab};
-use crate::app::AppState;
+use crate::state::AppState;
 use crate::widgets::WordGrid;
 
 #[derive(Debug)]

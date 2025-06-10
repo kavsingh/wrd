@@ -1,3 +1,7 @@
+mod app_tabs;
+mod state;
+mod widgets;
+
 use color_eyre::Result;
 use color_eyre::eyre::WrapErr;
 use ratatui::buffer::Buffer;
@@ -10,15 +14,9 @@ use ratatui::symbols::border;
 use ratatui::text::Line;
 use ratatui::widgets::{Block, Paragraph, StatefulWidget, StatefulWidgetRef, Tabs, Widget};
 use ratatui::{DefaultTerminal, Frame};
-use wrd_lib::Dictionary;
 
 use crate::app_tabs::{AppTab, AppTabIo, MatchWords, NotWordle, Settings, Tab};
-
-#[derive(Debug)]
-pub struct AppState {
-	pub dictionary: Dictionary,
-	pub cursor_position: Option<(u16, u16)>,
-}
+use crate::state::AppState;
 
 #[derive(Default, Debug)]
 pub struct App<'a> {
@@ -27,15 +25,6 @@ pub struct App<'a> {
 	settings: Settings,
 	selected_tab: Tab,
 	exit: bool,
-}
-
-impl Default for AppState {
-	fn default() -> Self {
-		Self {
-			dictionary: Dictionary::Moby,
-			cursor_position: None,
-		}
-	}
 }
 
 impl App<'_> {
