@@ -172,17 +172,21 @@ fn format_tokenized(tokenized: &[GuessResultToken]) -> Vec<Span> {
 		.iter()
 		.cloned()
 		.map(|token| match token {
-			GuessResultToken::Right(c) => Span::from(format!(" {c} "))
+			GuessResultToken::Right(c) => upper_span(c)
 				.bg(tailwind::ORANGE.c400)
 				.fg(tailwind::WHITE)
 				.bold(),
-			GuessResultToken::WrongPosition(c) => Span::from(format!(" {c} "))
+			GuessResultToken::WrongPosition(c) => upper_span(c)
 				.bg(tailwind::BLUE.c400)
 				.fg(tailwind::WHITE)
 				.bold(),
-			GuessResultToken::Wrong(c) => Span::from(format!(" {c} ")).dim(),
+			GuessResultToken::Wrong(c) => upper_span(c).dim(),
 		})
 		.collect()
+}
+
+fn upper_span<'a>(c: String) -> Span<'a> {
+	Span::from(format!(" {} ", c.to_uppercase()))
 }
 
 // a = ascii 97
