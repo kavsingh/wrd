@@ -80,7 +80,7 @@ fn parse_data(name: &str) -> Vec<&'static str> {
 			.get(name)
 			.unwrap_or_else(|| panic!("{name} data not found")),
 	)
-	.unwrap_or_else(|e| panic!("could not read {name}: {}", e))
+	.unwrap_or_else(|e| panic!("could not read {name}: {e}"))
 	.lines()
 	.filter_map(non_empty_str)
 	.collect()
