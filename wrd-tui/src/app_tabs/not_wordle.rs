@@ -165,6 +165,11 @@ impl NotWordle<'_> {
 		block.render(area, buf);
 		self.word_grid.render_ref(grid_area, buf);
 	}
+
+	fn stop_editing(&mut self, state: &mut AppState) {
+		self.edit_guess = None;
+		state.cursor_position = None;
+	}
 }
 
 fn format_tokenized(tokenized: &[GuessResultToken]) -> Vec<Span> {
@@ -213,11 +218,13 @@ impl AppTabIo for NotWordle<'_> {
 		Tab::NotWordle
 	}
 
-	fn set_active(&mut self, is_active: bool, _: &mut AppState) {
+	fn set_active(&mut self, is_active: bool, state: &mut AppState) {
 		self.is_active = is_active;
 
-		if !is_active {
-			self.edit_guess = None;
+		if !self.is_active {
+			self.stop_editing(state);
+		} else if !self.guesses.is_empty() {
+			self.edit_guess = Some((self.guesses.len() - 1) as u16)
 		}
 	}
 
@@ -231,7 +238,7 @@ impl AppTabIo for NotWordle<'_> {
 
 			match key_event.code {
 				KeyCode::Char('+') if !is_editing => self.add_guess(),
-				KeyCode::Esc => self.edit_guess = None,
+				KeyCode::Esc => self.stop_editing(state),
 				KeyCode::Enter if is_editing => self.commit_guess(state),
 				KeyCode::Tab => self.go_to_next_guess(),
 				KeyCode::Char(c) if !is_editing => {

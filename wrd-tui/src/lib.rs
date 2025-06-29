@@ -27,6 +27,10 @@ pub struct App<'a> {
 	exit: bool,
 }
 
+struct EventHandleResult {
+	was_handled: bool,
+}
+
 impl App<'_> {
 	pub fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
 		let mut state = AppState::default();
@@ -51,21 +55,26 @@ impl App<'_> {
 
 	fn handle_events(&mut self, state: &mut AppState) -> Result<()> {
 		let received_event = event::read()?;
+		let mut should_forward = true;
 
 		if let Event::Key(key_event) = received_event {
-			self.handle_key_event(key_event, state)
-				.wrap_err_with(|| format!("handling key event failed:\n{key_event:#?}"))?;
+			should_forward = !self
+				.handle_key_event(key_event, state)
+				.wrap_err_with(|| format!("handling key event failed:\n{key_event:#?}"))?
+				.was_handled;
 		}
 
-		self.match_words
-			.handle_event(&received_event, state)
-			.wrap_err("match words: handle events failed")?;
-		self.not_wordle
-			.handle_event(&received_event, state)
-			.wrap_err("not wordle: handle events failed")?;
-		self.settings
-			.handle_event(&received_event, state)
-			.wrap_err("settings: handle events failed")?;
+		if should_forward {
+			self.match_words
+				.handle_event(&received_event, state)
+				.wrap_err("match words: handle events failed")?;
+			self.not_wordle
+				.handle_event(&received_event, state)
+				.wrap_err("not wordle: handle events failed")?;
+			self.settings
+				.handle_event(&received_event, state)
+				.wrap_err("settings: handle events failed")?;
+		}
 
 		Ok(())
 	}
@@ -78,20 +87,24 @@ impl App<'_> {
 		}
 	}
 
-	fn handle_key_event(&mut self, key_event: KeyEvent, state: &mut AppState) -> Result<()> {
+	fn handle_key_event(
+		&mut self,
+		key_event: KeyEvent,
+		state: &mut AppState,
+	) -> Result<EventHandleResult> {
 		match key_event.code {
 			KeyCode::Char('c') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
-				self.exit()
+				self.exit();
+				Ok(EventHandleResult { was_handled: true })
 			}
-			KeyCode::Char(c) => {
+			KeyCode::Char(c) if c.is_ascii_digit() && state.cursor_position.is_none() => {
 				if let Some(num) = c.to_digit(10) {
 					self.go_to_tab(num as usize, state);
-				}
+				};
+				Ok(EventHandleResult { was_handled: true })
 			}
-			_ => (),
+			_ => Ok(EventHandleResult { was_handled: false }),
 		}
-
-		Ok(())
 	}
 
 	fn go_to_tab(&mut self, tab_num: usize, state: &mut AppState) {
