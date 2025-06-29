@@ -214,7 +214,10 @@ impl AppTabIo for NotWordle<'_> {
 	}
 
 	fn set_active(&mut self, is_active: bool, _: &mut AppState) {
-		self.is_active = is_active
+		self.is_active = is_active;
+		if !is_active {
+			self.edit_guess = None;
+		}
 	}
 
 	fn handle_event(&mut self, event: &Event, state: &mut AppState) -> Result<()> {
@@ -230,8 +233,6 @@ impl AppTabIo for NotWordle<'_> {
 				KeyCode::Esc => self.edit_guess = None,
 				KeyCode::Enter if is_editing => self.commit_guess(state),
 				KeyCode::Tab => self.go_to_next_guess(),
-				// Skip digit keys (0-9) as they are handled by the main app for tab switching
-				KeyCode::Char(c) if c.is_ascii_digit() => (),
 				KeyCode::Char(c) if !is_editing => {
 					let target_index = char_to_index(c);
 
