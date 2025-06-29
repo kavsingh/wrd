@@ -214,7 +214,11 @@ impl AppTabIo for NotWordle<'_> {
 	}
 
 	fn set_active(&mut self, is_active: bool, _: &mut AppState) {
-		self.is_active = is_active
+		self.is_active = is_active;
+
+		if !is_active {
+			self.edit_guess = None;
+		}
 	}
 
 	fn handle_event(&mut self, event: &Event, state: &mut AppState) -> Result<()> {
