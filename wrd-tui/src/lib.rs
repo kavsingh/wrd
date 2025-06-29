@@ -27,8 +27,10 @@ pub struct App<'a> {
 	exit: bool,
 }
 
-struct EventHandleResult {
-	was_handled: bool,
+#[derive(PartialEq)]
+enum EventHandledStatus {
+	Handled,
+	NotHandled,
 }
 
 impl App<'_> {
@@ -58,10 +60,10 @@ impl App<'_> {
 		let mut should_forward = true;
 
 		if let Event::Key(key_event) = received_event {
-			should_forward = !self
+			should_forward = self
 				.handle_key_event(key_event, state)
 				.wrap_err_with(|| format!("handling key event failed:\n{key_event:#?}"))?
-				.was_handled;
+				== EventHandledStatus::NotHandled
 		}
 
 		if should_forward {
@@ -91,19 +93,19 @@ impl App<'_> {
 		&mut self,
 		key_event: KeyEvent,
 		state: &mut AppState,
-	) -> Result<EventHandleResult> {
+	) -> Result<EventHandledStatus> {
 		match key_event.code {
 			KeyCode::Char('c') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
 				self.exit();
-				Ok(EventHandleResult { was_handled: true })
+				Ok(EventHandledStatus::Handled)
 			}
 			KeyCode::Char(c) if c.is_ascii_digit() && state.cursor_position.is_none() => {
 				if let Some(num) = c.to_digit(10) {
 					self.go_to_tab(num as usize, state);
 				};
-				Ok(EventHandleResult { was_handled: true })
+				Ok(EventHandledStatus::Handled)
 			}
-			_ => Ok(EventHandleResult { was_handled: false }),
+			_ => Ok(EventHandledStatus::NotHandled),
 		}
 	}
 
