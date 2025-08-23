@@ -172,7 +172,7 @@ impl NotWordle<'_> {
 	}
 }
 
-fn format_tokenized(tokenized: &[GuessResultToken]) -> Vec<Span> {
+fn format_tokenized(tokenized: &[GuessResultToken]) -> Vec<Span<'_>> {
 	tokenized
 		.iter()
 		.cloned()
@@ -244,10 +244,10 @@ impl AppTabIo for NotWordle<'_> {
 				KeyCode::Char(c) if !is_editing => {
 					let target_index = char_to_index(c);
 
-					if let Some(index) = target_index {
-						if index < self.guesses.len() as u16 {
-							self.edit_guess = Some(index);
-						};
+					if let Some(index) = target_index
+						&& index < self.guesses.len() as u16
+					{
+						self.edit_guess = Some(index);
 					}
 				}
 				_ if is_editing => self.forward_event_to_input(event),

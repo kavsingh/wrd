@@ -112,10 +112,11 @@ fn tokenize_pattern(input: &str) -> Result<Vec<MatcherToken>, String> {
 	let tokens = parts
 		.iter()
 		.fold(vec![], |mut acc: Vec<&str>, part| {
-			if let Some(last) = acc.last() {
-				if *last == "**" && *part == "**" {
-					return acc;
-				}
+			if let Some(last) = acc.last()
+				&& *last == "**"
+				&& *part == "**"
+			{
+				return acc;
 			}
 
 			acc.push(part);
