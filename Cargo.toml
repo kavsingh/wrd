@@ -1,3 +1,7 @@
 [workspace]
-resolver = "2"
+resolver = "3"
 members = ["wrd-lib", "wrd", "wrd-tui"]
+
+[workspace.package]
+version = "0.2.0"
+edition = "2024"
