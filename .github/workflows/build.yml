@@ -1,38 +1,38 @@
 name: Build
 
 on:
-  workflow_dispatch:
+    workflow_dispatch:
 
 jobs:
-  test-lint:
-    name: Test and lint
-    uses: ./.github/workflows/test-lint.yml
-    secrets: inherit
+    test-lint:
+        name: Test and lint
+        uses: ./.github/workflows/test-lint.yml
+        secrets: inherit
 
-  build:
-    name: Build
-    needs: test-lint
-    permissions:
-      contents: write
-    defaults:
-      run:
-        shell: bash
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup
-      - run: cargo build --release
-      - if: ${{ success() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: wrd
-          path: target/release/wrd
-          if-no-files-found: error
-          overwrite: true
-      - if: ${{ success() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: wrd-tui
-          path: target/release/wrd-tui
-          if-no-files-found: error
-          overwrite: true
+    build:
+        name: Build
+        needs: test-lint
+        permissions:
+            contents: write
+        defaults:
+            run:
+                shell: bash
+        runs-on: macos-latest
+        steps:
+            - uses: actions/checkout@v6
+            - uses: ./.github/actions/setup
+            - run: cargo build --release
+            - if: ${{ success() }}
+              uses: actions/upload-artifact@v4
+              with:
+                  name: wrd
+                  path: target/release/wrd
+                  if-no-files-found: error
+                  overwrite: true
+            - if: ${{ success() }}
+              uses: actions/upload-artifact@v4
+              with:
+                  name: wrd-tui
+                  path: target/release/wrd-tui
+                  if-no-files-found: error
+                  overwrite: true

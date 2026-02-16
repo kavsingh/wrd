@@ -8,4 +8,4 @@ crate-type = ["lib"]
 
 [dependencies]
 fancy-regex = '0.14.0'
-rust-embed = "8.8.0"
+rust-embed = "8.11.0"
