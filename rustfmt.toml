@@ -1,8 +1,5 @@
-#:tombi schema.strict = false
-
 group_imports = "StdExternalCrate"
 hard_tabs = true
 imports_granularity = "Module"
-reorder_imported_names = true
 reorder_imports = true
 reorder_modules = true
