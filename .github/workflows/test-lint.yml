@@ -14,5 +14,7 @@ jobs:
         steps:
             - uses: actions/checkout@v4
             - uses: ./.github/actions/setup
+            - run: cargo check
             - run: cargo test
             - run: cargo clippy --all-targets --all-features
+            - run: rustup toolchain install nightly --profile minimal --no-self-update && cargo +nightly fmt -- --check
