@@ -7,5 +7,5 @@ edition.workspace = true
 crate-type = ["lib"]
 
 [dependencies]
-fancy-regex = '0.14.0'
+fancy-regex = "0.14.0"
 rust-embed = "8.11.0"

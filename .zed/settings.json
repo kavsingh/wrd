@@ -1,16 +1,5 @@
 {
-	"languages": {
-		"Rust": {
-			"formatter": "language_server",
-			"preferred_line_length": 100,
-		},
-		"TOML": {
-			"language_servers": ["tombi"],
-			"formatter": "language_server",
-		},
-		"YAML": { "formatter": "language_server" },
-		"JSON": { "formatter": "language_server" },
-	},
+	"preferred_line_length": 100,
 
 	"lsp": {
 		"rust-analyzer": {
@@ -21,5 +10,12 @@
 				"rustfmt": { "extraArgs": ["+nightly"] },
 			},
 		},
+	},
+
+	"languages": {
+		"Rust": { "formatter": "language_server" },
+		"TOML": { "language_servers": ["tombi"], "formatter": "language_server" },
+		"YAML": { "formatter": "language_server" },
+		"JSON": { "formatter": "language_server" },
 	},
 }
