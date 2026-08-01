@@ -5,6 +5,20 @@ use fancy_regex::Regex;
 use crate::match_words::{MatcherToken, match_words_from_tokens};
 use crate::util::{non_empty_str, unique_string};
 
+#[derive(thiserror::Error, Debug, PartialEq, Eq)]
+pub enum NotwordleError {
+	#[error("could not get remaining words: {0}")]
+	FailedToMatch(#[from] crate::match_words::MatchWordsError),
+	#[error(
+		"all guess results must have the same number of entries, got {current}, previous had {previous}"
+	)]
+	InvalidGuessResultLength { current: usize, previous: usize },
+	#[error("invalid guess result entry: {0}")]
+	InvalidGuessResultEntry(String),
+	#[error("no characters to match in entry: {0}")]
+	GuessResultEntryNeedsChar(String),
+}
+
 #[derive(Default)]
 pub struct Notwordle {
 	guess_results: Vec<Vec<GuessResultToken>>,
@@ -21,7 +35,10 @@ impl Notwordle {
 	/// # Errors
 	/// Errors if guess result token count does not match previous entries.
 	/// Propagates errors from `tokenize_guess_result`.
-	pub fn register_guess_result(&mut self, result: &str) -> Result<Vec<GuessResultToken>, String> {
+	pub fn register_guess_result(
+		&mut self,
+		result: &str,
+	) -> Result<Vec<GuessResultToken>, NotwordleError> {
 		let tokenized = tokenize_guess_result(result)?;
 
 		if let Some(stored) = self.guess_results.last() {
@@ -29,9 +46,10 @@ impl Notwordle {
 			let new_len = tokenized.len();
 
 			if stored_len != new_len {
-				return Err(format!(
-					"previous had {stored_len} items, got {new_len} items"
-				));
+				return Err(NotwordleError::InvalidGuessResultLength {
+					current: new_len,
+					previous: stored_len,
+				});
 			}
 		}
 
@@ -45,7 +63,7 @@ impl Notwordle {
 	pub fn refine(&self, words: Option<&[&'static str]>) -> Result<Vec<&str>, String> {
 		let (tokens, include, exclude) = get_match_args_from_results(&self.guess_results);
 
-		match_words_from_tokens(&tokens, &include, &exclude, "", words)
+		match_words_from_tokens(&tokens, &include, &exclude, "", words).map_err(|e| e.to_string())
 	}
 }
 
@@ -53,24 +71,26 @@ impl Notwordle {
 static GUESS_TOKEN_REGEX: LazyLock<Regex> =
 	LazyLock::new(|| Regex::new(r"^([!?])?([a-z])$").expect("invalid guess regex"));
 
-fn tokenize_guess_result(input: &str) -> Result<Vec<GuessResultToken>, String> {
+fn tokenize_guess_result(input: &str) -> Result<Vec<GuessResultToken>, NotwordleError> {
 	let entries: Vec<_> = input.split(' ').filter_map(non_empty_str).collect();
 	let mut result: Vec<GuessResultToken> = vec![];
 
 	for entry in entries {
 		let Ok(Some(captures)) = GUESS_TOKEN_REGEX.captures(entry) else {
-			return Err(format!("invalid input {entry}"));
+			return Err(NotwordleError::InvalidGuessResultEntry(entry.to_string()));
 		};
 
 		match (
 			captures.get(1).map(|c| c.as_str()),
 			captures.get(2).map(|c| c.as_str().to_owned()),
 		) {
-			(_, None) => return Err(format!("no values in input {entry}")),
 			(None, Some(c)) => result.push(GuessResultToken::Right(c)),
 			(Some("!"), Some(c)) => result.push(GuessResultToken::Wrong(c)),
 			(Some("?"), Some(c)) => result.push(GuessResultToken::WrongPosition(c)),
-			_ => return Err(format!("invalid input {entry}")),
+			(_, None) => {
+				return Err(NotwordleError::GuessResultEntryNeedsChar(entry.to_string()));
+			}
+			_ => return Err(NotwordleError::InvalidGuessResultEntry(entry.to_string())),
 		}
 	}
 
@@ -143,19 +163,19 @@ mod tokenize_tests {
 	fn should_error_on_invalid_input() {
 		assert_eq!(
 			tokenize_guess_result("p ?q !r aa").unwrap_err(),
-			"invalid input aa"
+			NotwordleError::InvalidGuessResultEntry("aa".to_string())
 		);
 		assert_eq!(
 			tokenize_guess_result("p ??q !r a").unwrap_err(),
-			"invalid input ??q"
+			NotwordleError::InvalidGuessResultEntry("??q".to_string())
 		);
 		assert_eq!(
 			tokenize_guess_result("p ?q !?r a").unwrap_err(),
-			"invalid input !?r"
+			NotwordleError::InvalidGuessResultEntry("!?r".to_string())
 		);
 		assert_eq!(
 			tokenize_guess_result("p? ?q !r a").unwrap_err(),
-			"invalid input p?"
+			NotwordleError::InvalidGuessResultEntry("p?".to_string())
 		);
 	}
 

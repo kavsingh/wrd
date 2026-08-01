@@ -88,7 +88,7 @@ impl MatchWords<'_> {
 	}
 
 	fn refresh_results(&mut self, state: &AppState) {
-		let Some(dict) = get_dictionary(&state.dictionary) else {
+		let Ok(dict) = get_dictionary(&state.dictionary) else {
 			return;
 		};
 		let results = wrd_lib::match_words(

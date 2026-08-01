@@ -52,7 +52,7 @@ impl NotWordle<'_> {
 		let mut not_wordle = wrd_lib::Notwordle::default();
 
 		// @TODO: surface error
-		let Some(dict) = get_dictionary(&state.dictionary) else {
+		let Ok(dict) = get_dictionary(&state.dictionary) else {
 			return;
 		};
 

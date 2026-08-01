@@ -5,16 +5,22 @@ use fancy_regex::Regex;
 use crate::data::{Dictionary, get_dictionary};
 use crate::util::non_empty_str;
 
+#[derive(thiserror::Error, Debug, PartialEq, Eq)]
+pub enum MatchWordsError {
+	#[error("unexpected empty pattern")]
+	EmptyPattern,
+	#[error("invalid pattern {0}")]
+	InvalidPattern(String),
+	#[error("could not create matcher {pattern}: {cause}")]
+	CreateMatcherFailed { pattern: String, cause: String },
+}
+
 #[derive(Clone, Debug)]
 pub enum MatcherToken {
-	// **
-	MatchAnyChars,
-	// *
-	MatchAnyChar,
-	// a-z
-	MatchAnyCharIn(String),
-	// !a-z
-	ExcludeAllCharsIn(String),
+	MatchAnyChars,             // **
+	MatchAnyChar,              // *
+	MatchAnyCharIn(String),    // a-z
+	ExcludeAllCharsIn(String), // !a-z
 }
 
 impl PartialEq for MatcherToken {
@@ -43,7 +49,7 @@ pub fn match_words<'a>(
 	exclude: &str,
 	within: &str,
 	haystack: Option<&[&'a str]>,
-) -> Result<Vec<&'a str>, String> {
+) -> Result<Vec<&'a str>, MatchWordsError> {
 	let tokens = tokenize_pattern(pattern)?;
 	let result = match_words_from_tokens(&tokens, include, exclude, within, haystack)?;
 
@@ -58,7 +64,7 @@ pub fn match_words_from_tokens<'a>(
 	exclude: &str,
 	within: &str,
 	haystack: Option<&[&'a str]>,
-) -> Result<Vec<&'a str>, String> {
+) -> Result<Vec<&'a str>, MatchWordsError> {
 	let regex = regex_from_tokens(tokens)?;
 	let empty = &EMPTY_WORDS;
 	let result: Vec<&str> = haystack
@@ -98,7 +104,7 @@ fn match_word(
 		.map_err(|err| format!("could not match: {err}"))
 }
 
-fn regex_from_tokens(tokens: &[MatcherToken]) -> Result<Regex, String> {
+fn regex_from_tokens(tokens: &[MatcherToken]) -> Result<Regex, MatchWordsError> {
 	let pattern = tokens
 		.iter()
 		.map(|token| match token {
@@ -110,14 +116,17 @@ fn regex_from_tokens(tokens: &[MatcherToken]) -> Result<Regex, String> {
 		.collect::<String>();
 	let bounded = format!("^{pattern}$");
 
-	Regex::new(&bounded).map_err(|err| format!("invalid regex {pattern}: {err}"))
+	Regex::new(&bounded).map_err(|e| MatchWordsError::CreateMatcherFailed {
+		pattern: bounded,
+		cause: e.to_string(),
+	})
 }
 
-fn tokenize_pattern(input: &str) -> Result<Vec<MatcherToken>, String> {
+fn tokenize_pattern(input: &str) -> Result<Vec<MatcherToken>, MatchWordsError> {
 	let parts: Vec<_> = input.split(' ').filter_map(non_empty_str).collect();
 
 	if parts.is_empty() {
-		return Err("invalid empty input".to_string());
+		return Err(MatchWordsError::EmptyPattern);
 	}
 
 	let tokens = parts
@@ -144,7 +153,7 @@ fn tokenize_pattern(input: &str) -> Result<Vec<MatcherToken>, String> {
 static MATCH_CHARS_TOKEN_REGEX: LazyLock<Regex> =
 	LazyLock::new(|| Regex::new(r"^(\!)?([a-z]+)$").expect("invalid match token regex"));
 
-fn tokenize(input: &str) -> Result<MatcherToken, String> {
+fn tokenize(input: &str) -> Result<MatcherToken, MatchWordsError> {
 	if input == "**" {
 		return Ok(MatcherToken::MatchAnyChars);
 	}
@@ -154,7 +163,7 @@ fn tokenize(input: &str) -> Result<MatcherToken, String> {
 	}
 
 	let Ok(Some(captures)) = MATCH_CHARS_TOKEN_REGEX.captures(input) else {
-		return Err(format!("invalid input {input}"));
+		return Err(MatchWordsError::InvalidPattern(input.to_string()));
 	};
 
 	match (
@@ -163,7 +172,7 @@ fn tokenize(input: &str) -> Result<MatcherToken, String> {
 	) {
 		(Some("!"), Some(letters)) => Ok(MatcherToken::ExcludeAllCharsIn(letters)),
 		(None, Some(letters)) => Ok(MatcherToken::MatchAnyCharIn(letters)),
-		_ => Err(format!("invalid input {input}")),
+		_ => Err(MatchWordsError::InvalidPattern(input.to_string())),
 	}
 }
 
@@ -175,16 +184,25 @@ mod tokenize_tests {
 	#[test]
 	#[allow(clippy::panic)]
 	fn should_error_on_invalid_pattern() {
-		assert_eq!(tokenize_pattern("").unwrap_err(), "invalid empty input");
+		assert_eq!(
+			tokenize_pattern("").unwrap_err(),
+			MatchWordsError::EmptyPattern
+		);
 		assert_eq!(
 			tokenize_pattern("* abc !def ghi!de").unwrap_err(),
-			"invalid input ghi!de"
+			MatchWordsError::InvalidPattern("ghi!de".to_string())
 		);
-		assert_eq!(tokenize_pattern("45 ").unwrap_err(), "invalid input 45");
-		assert_eq!(tokenize_pattern("***").unwrap_err(), "invalid input ***");
+		assert_eq!(
+			tokenize_pattern("45 ").unwrap_err(),
+			MatchWordsError::InvalidPattern("45".to_string())
+		);
+		assert_eq!(
+			tokenize_pattern("***").unwrap_err(),
+			MatchWordsError::InvalidPattern("***".to_string())
+		);
 		assert_eq!(
 			tokenize_pattern("ABC !def").unwrap_err(),
-			"invalid input ABC"
+			MatchWordsError::InvalidPattern("ABC".to_string())
 		);
 	}
 

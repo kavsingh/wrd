@@ -41,8 +41,18 @@ impl Dictionary {
 	}
 }
 
-pub fn get_dictionary(dict: &Dictionary) -> Option<&'static Vec<&'static str>> {
-	DICTIONARIES.get(dict.name())
+#[derive(Debug, thiserror::Error)]
+pub enum DataError {
+	#[error("dictionary {0} not found")]
+	DictionaryNotFound(String),
+}
+
+/// # Errors
+/// Returns an error if the dictionary is not found.
+pub fn get_dictionary(dict: &Dictionary) -> Result<&'static Vec<&'static str>, DataError> {
+	DICTIONARIES
+		.get(dict.name())
+		.ok_or_else(|| DataError::DictionaryNotFound(dict.name().to_string()))
 }
 
 fn load_dict_data() -> HashMap<&'static str, Cow<'static, [u8]>> {
