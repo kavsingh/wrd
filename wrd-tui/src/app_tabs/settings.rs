@@ -54,10 +54,7 @@ impl Settings {
 		for (index, option_area) in option_areas.iter().enumerate() {
 			if let Some(dict) = self.dict_options.get(index) {
 				let is_selected = *dict == state.dictionary;
-				let is_highlighted = match self.get_highlighted_dict() {
-					Some(highlighted) => *highlighted == *dict,
-					None => false,
-				};
+				let is_highlighted = self.get_highlighted_dict() == Some(dict);
 
 				Paragraph::new(format!(
 					" {} {} ",
@@ -105,7 +102,10 @@ impl AppTabIo for Settings {
 			match key_event.code {
 				KeyCode::Tab => {
 					self.highlighted_dict_index = match self.highlighted_dict_index {
-						Some(index) => Some((index + 1) % self.dict_options.len()),
+						Some(index) => index
+							.saturating_add(1)
+							.checked_rem(self.dict_options.len())
+							.or(Some(0)),
 						None => Some(0),
 					}
 				}
@@ -116,7 +116,7 @@ impl AppTabIo for Settings {
 				}
 				_ => (),
 			}
-		};
+		}
 
 		Ok(())
 	}
@@ -127,8 +127,9 @@ impl StatefulWidgetRef for Settings {
 
 	fn render_ref(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
 		let block = Block::new().padding(Padding::uniform(1));
+		let len = u16::try_from(self.dict_options.len()).unwrap_or_default();
 		let [dict_area] =
-			Layout::vertical([Length(self.dict_options.len() as u16 + 2)]).areas(block.inner(area));
+			Layout::vertical([Length(len.saturating_add(2))]).areas(block.inner(area));
 
 		self.render_dictionary_select(dict_area, buf, state);
 		block.render(area, buf);

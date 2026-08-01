@@ -3,6 +3,8 @@ use std::error::Error;
 use colored::Colorize;
 use wrd_lib::{GuessResultToken, Notwordle, match_words};
 
+/// # Errors
+/// Propagates errors from `match_words`.
 pub fn match_words_runner(
 	pattern: &str,
 	include: &str,
@@ -16,9 +18,11 @@ pub fn match_words_runner(
 	Ok(())
 }
 
+/// # Errors
+/// Propagates errors from `Notwordle::register_guess_result` and `Notwordle::refine`.
 pub fn notwordle_runner(guess_results: &str) -> Result<(), Box<dyn Error>> {
 	let mut notwordle = Notwordle::default();
-	let results: Vec<&str> = guess_results.split(",").collect();
+	let results: Vec<&str> = guess_results.split(',').collect();
 	let mut print_items: Vec<&str> = vec![];
 
 	for result in results {
@@ -43,7 +47,7 @@ fn format_word_grid(words: &[&str]) -> String {
 		.chunks(14)
 		.map(|c| {
 			c.iter()
-				.fold("".to_string(), |s, c| format!("{s}\t{}", c.dimmed()))
+				.fold(String::new(), |s, c| format!("{s}\t{}", c.dimmed()))
 		})
 		.collect::<Vec<_>>()
 		.join("\n")
@@ -57,5 +61,5 @@ fn format_notwordle_guess_result(result: &[GuessResultToken]) -> String {
 			GuessResultToken::WrongPosition(c) => c.blue(),
 			GuessResultToken::Wrong(c) => c.dimmed(),
 		})
-		.fold("".to_string(), |s, c| format!("{s}{c}"))
+		.fold(String::new(), |s, c| format!("{s}{c}"))
 }

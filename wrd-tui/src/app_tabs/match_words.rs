@@ -26,13 +26,12 @@ enum TargetInput {
 }
 
 impl TargetInput {
-	fn next(&self) -> Self {
+	const fn next(&self) -> Self {
 		match &self {
-			TargetInput::None => TargetInput::Pattern,
-			TargetInput::Pattern => TargetInput::Within,
-			TargetInput::Within => TargetInput::Include,
-			TargetInput::Include => TargetInput::Exclude,
-			TargetInput::Exclude => TargetInput::Pattern,
+			Self::Pattern => Self::Within,
+			Self::Within => Self::Include,
+			Self::Include => Self::Exclude,
+			Self::Exclude | Self::None => Self::Pattern,
 		}
 	}
 }
@@ -58,8 +57,8 @@ impl Default for MatchWords<'_> {
 		let exclude = "";
 		let results: Vec<_> = wrd_lib::match_words(pattern, include, exclude, within, None)
 			.unwrap_or_default()
-			.iter()
-			.map(|s| s.to_string())
+			.into_iter()
+			.map(str::to_string)
 			.collect();
 
 		word_grid.update(&results);
@@ -84,21 +83,24 @@ impl MatchWords<'_> {
 			TargetInput::Within => self.within_input.handle_event(event),
 			TargetInput::Include => self.include_input.handle_event(event),
 			TargetInput::Exclude => self.exclude_input.handle_event(event),
-			_ => None,
+			TargetInput::None => None,
 		};
 	}
 
 	fn refresh_results(&mut self, state: &AppState) {
+		let Some(dict) = get_dictionary(&state.dictionary) else {
+			return;
+		};
 		let results = wrd_lib::match_words(
 			self.pattern_input.value(),
 			self.include_input.value(),
 			self.exclude_input.value(),
 			self.within_input.value(),
-			Some(get_dictionary(&state.dictionary)),
+			Some(dict),
 		)
 		.unwrap_or_default();
 
-		self.results = results.iter().map(|s| s.to_string()).collect();
+		self.results = results.into_iter().map(str::to_string).collect();
 		self.word_grid.update(&self.results);
 	}
 
@@ -146,14 +148,22 @@ impl MatchWords<'_> {
 				.render(label_area, buf);
 
 			Paragraph::new(input.value())
-				.scroll((0, input.visual_scroll(area.width as usize) as u16))
+				.scroll((
+					0,
+					u16::try_from(input.visual_scroll(usize::from(area.width))).unwrap_or_default(),
+				))
 				.render(input_area, buf);
 
 			if is_active {
-				let scroll = input.visual_scroll(input_area.width as usize);
+				let scroll = input.visual_scroll(usize::from(input_area.width));
 				let x = input.visual_cursor().max(scroll);
 
-				state.cursor_position = Some((input_area.x + x as u16, input_area.y));
+				state.cursor_position = Some((
+					input_area
+						.x
+						.saturating_add(u16::try_from(x).unwrap_or_default()),
+					input_area.y,
+				));
 			}
 		}
 	}
@@ -202,7 +212,7 @@ impl AppTabIo for MatchWords<'_> {
 				KeyCode::Enter => self.refresh_results(state),
 				_ => self.forward_event_to_input(event),
 			}
-		};
+		}
 
 		Ok(())
 	}

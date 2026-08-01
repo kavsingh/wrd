@@ -18,21 +18,22 @@ static DICT_DATA: LazyLock<HashMap<&'static str, Cow<'static, [u8]>>> =
 static DICTIONARIES: LazyLock<HashMap<&'static str, Vec<&'static str>>> =
 	LazyLock::new(parse_dict_data);
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Dictionary {
 	Moby,
 	Gwicks,
 }
 
 impl Dictionary {
-	pub fn name(&self) -> &'static str {
+	#[must_use]
+	pub const fn name(&self) -> &'static str {
 		match *self {
 			Self::Moby => "moby",
 			Self::Gwicks => "gwicks",
 		}
 	}
 
-	fn asset(&self) -> &'static str {
+	const fn asset(&self) -> &'static str {
 		match *self {
 			Self::Moby => "words-moby.txt",
 			Self::Gwicks => "words-gwicks-usa2.txt",
@@ -40,12 +41,8 @@ impl Dictionary {
 	}
 }
 
-pub fn get_dictionary(dict: &Dictionary) -> &'static Vec<&'static str> {
-	let name = dict.name();
-
-	DICTIONARIES
-		.get(name)
-		.unwrap_or_else(|| panic!("{name} data not found"))
+pub fn get_dictionary(dict: &Dictionary) -> Option<&'static Vec<&'static str>> {
+	DICTIONARIES.get(dict.name())
 }
 
 fn load_dict_data() -> HashMap<&'static str, Cow<'static, [u8]>> {
@@ -68,12 +65,14 @@ fn parse_dict_data() -> HashMap<&'static str, Vec<&'static str>> {
 	dicts
 }
 
+#[allow(clippy::panic)]
 fn load_data(name: &str) -> Cow<'static, [u8]> {
 	Assets::get(name)
 		.unwrap_or_else(|| panic!("could not load {name}"))
 		.data
 }
 
+#[allow(clippy::panic)]
 fn parse_data(name: &str) -> Vec<&'static str> {
 	str::from_utf8(
 		DICT_DATA

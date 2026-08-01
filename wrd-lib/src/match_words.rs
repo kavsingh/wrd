@@ -20,15 +20,23 @@ pub enum MatcherToken {
 impl PartialEq for MatcherToken {
 	fn eq(&self, other: &Self) -> bool {
 		match (self, other) {
-			(Self::MatchAnyChars, Self::MatchAnyChars) => true,
-			(Self::MatchAnyChar, Self::MatchAnyChar) => true,
-			(Self::MatchAnyCharIn(a), Self::MatchAnyCharIn(b)) => a == b,
-			(Self::ExcludeAllCharsIn(a), Self::ExcludeAllCharsIn(b)) => a == b,
+			(
+				Self::MatchAnyChar | Self::MatchAnyChars,
+				Self::MatchAnyChar | Self::MatchAnyChars,
+			) => true,
+
+			(
+				Self::MatchAnyCharIn(a) | Self::ExcludeAllCharsIn(a),
+				Self::MatchAnyCharIn(b) | Self::ExcludeAllCharsIn(b),
+			) => a == b,
+
 			_ => false,
 		}
 	}
 }
 
+/// # Errors
+/// Propagates errors from `tokenize_pattern` and `match_words_from_tokens`.
 pub fn match_words<'a>(
 	pattern: &str,
 	include: &str,
@@ -42,6 +50,8 @@ pub fn match_words<'a>(
 	Ok(result)
 }
 
+const EMPTY_WORDS: Vec<&'static str> = vec![];
+
 pub fn match_words_from_tokens<'a>(
 	tokens: &[MatcherToken],
 	include: &str,
@@ -50,11 +60,12 @@ pub fn match_words_from_tokens<'a>(
 	haystack: Option<&[&'a str]>,
 ) -> Result<Vec<&'a str>, String> {
 	let regex = regex_from_tokens(tokens)?;
+	let empty = &EMPTY_WORDS;
 	let result: Vec<&str> = haystack
-		.unwrap_or_else(|| get_dictionary(&Dictionary::Moby))
+		.unwrap_or_else(|| get_dictionary(&Dictionary::Moby).unwrap_or(empty))
 		.iter()
 		.filter(|word| match_word(word, &regex, include, exclude, within).unwrap_or(false))
-		.cloned()
+		.copied()
 		.collect();
 
 	Ok(result)
@@ -103,7 +114,7 @@ fn regex_from_tokens(tokens: &[MatcherToken]) -> Result<Regex, String> {
 }
 
 fn tokenize_pattern(input: &str) -> Result<Vec<MatcherToken>, String> {
-	let parts: Vec<_> = input.split(" ").filter_map(non_empty_str).collect();
+	let parts: Vec<_> = input.split(' ').filter_map(non_empty_str).collect();
 
 	if parts.is_empty() {
 		return Err("invalid empty input".to_string());
@@ -129,6 +140,7 @@ fn tokenize_pattern(input: &str) -> Result<Vec<MatcherToken>, String> {
 	Ok(tokens)
 }
 
+#[allow(clippy::expect_used)]
 static MATCH_CHARS_TOKEN_REGEX: LazyLock<Regex> =
 	LazyLock::new(|| Regex::new(r"^(\!)?([a-z]+)$").expect("invalid match token regex"));
 
@@ -141,9 +153,8 @@ fn tokenize(input: &str) -> Result<MatcherToken, String> {
 		return Ok(MatcherToken::MatchAnyChar);
 	}
 
-	let captures = match MATCH_CHARS_TOKEN_REGEX.captures(input) {
-		Ok(Some(c)) => c,
-		_ => return Err(format!("invalid input {input}")),
+	let Ok(Some(captures)) = MATCH_CHARS_TOKEN_REGEX.captures(input) else {
+		return Err(format!("invalid input {input}"));
 	};
 
 	match (
@@ -157,58 +168,40 @@ fn tokenize(input: &str) -> Result<MatcherToken, String> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tokenize_tests {
 	use super::*;
 
 	#[test]
+	#[allow(clippy::panic)]
 	fn should_error_on_invalid_pattern() {
-		let message = match tokenize_pattern("") {
-			Ok(_) => panic!("should not pass"),
-			Err(e) => e,
-		};
-
-		assert_eq!(message, "invalid empty input");
-
-		let message = match tokenize_pattern("* abc !def ghi!de") {
-			Ok(_) => panic!("should not pass"),
-			Err(e) => e,
-		};
-
-		assert_eq!(message, "invalid input ghi!de");
-
-		let message = match tokenize_pattern("45 ") {
-			Ok(_) => panic!("should not pass"),
-			Err(e) => e,
-		};
-
-		assert_eq!(message, "invalid input 45");
-
-		let message = match tokenize_pattern("***") {
-			Ok(_) => panic!("should not pass"),
-			Err(e) => e,
-		};
-
-		assert_eq!(message, "invalid input ***");
-
-		let message = match tokenize_pattern("ABC !def") {
-			Ok(_) => panic!("should not pass"),
-			Err(e) => e,
-		};
-
-		assert_eq!(message, "invalid input ABC");
+		assert_eq!(tokenize_pattern("").unwrap_err(), "invalid empty input");
+		assert_eq!(
+			tokenize_pattern("* abc !def ghi!de").unwrap_err(),
+			"invalid input ghi!de"
+		);
+		assert_eq!(tokenize_pattern("45 ").unwrap_err(), "invalid input 45");
+		assert_eq!(tokenize_pattern("***").unwrap_err(), "invalid input ***");
+		assert_eq!(
+			tokenize_pattern("ABC !def").unwrap_err(),
+			"invalid input ABC"
+		);
 	}
 
 	#[test]
-	fn should_tokenize_pattern() -> Result<(), String> {
-		assert_eq!(tokenize_pattern("**")?, vec![MatcherToken::MatchAnyChars]);
+	fn should_tokenize_pattern() {
+		assert_eq!(
+			tokenize_pattern("**").unwrap(),
+			vec![MatcherToken::MatchAnyChars]
+		);
 
 		assert_eq!(
-			tokenize_pattern("* ** **")?,
+			tokenize_pattern("* ** **").unwrap(),
 			vec![MatcherToken::MatchAnyChar, MatcherToken::MatchAnyChars,]
 		);
 
 		assert_eq!(
-			tokenize_pattern("* a !bcd ** ** ** ef * **")?,
+			tokenize_pattern("* a !bcd ** ** ** ef * **").unwrap(),
 			vec![
 				MatcherToken::MatchAnyChar,
 				MatcherToken::MatchAnyCharIn("a".to_string()),
@@ -219,12 +212,11 @@ mod tokenize_tests {
 				MatcherToken::MatchAnyChars,
 			]
 		);
-
-		Ok(())
 	}
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod match_words_tests {
 	use super::*;
 
@@ -234,36 +226,32 @@ mod match_words_tests {
 	];
 
 	#[test]
-	fn should_match_all_words() -> Result<(), String> {
+	fn should_match_all_words() {
 		let tokens = vec![MatcherToken::MatchAnyChars];
 
 		assert_eq!(
-			match_words_from_tokens(&tokens, "", "", "", Some(&TEST_WORDS))?,
+			match_words_from_tokens(&tokens, "", "", "", Some(&TEST_WORDS)).unwrap(),
 			&TEST_WORDS
 		);
-
-		Ok(())
 	}
 
 	#[test]
-	fn should_match_all_words_respecting_globals() -> Result<(), String> {
+	fn should_match_all_words_respecting_globals() {
 		let tokens = vec![MatcherToken::MatchAnyChars];
 
 		assert_eq!(
-			match_words_from_tokens(&tokens, "", "", "gfjk", Some(&TEST_WORDS))?,
+			match_words_from_tokens(&tokens, "", "", "gfjk", Some(&TEST_WORDS)).unwrap(),
 			vec!["fffggg", "jjkk"]
 		);
 
 		assert_eq!(
-			match_words_from_tokens(&tokens, "f", "", "gfjk", Some(&TEST_WORDS))?,
+			match_words_from_tokens(&tokens, "f", "", "gfjk", Some(&TEST_WORDS)).unwrap(),
 			vec!["fffggg"]
 		);
-
-		Ok(())
 	}
 
 	#[test]
-	fn should_constrain_chars_match_to_tokens_length() -> Result<(), String> {
+	fn should_constrain_chars_match_to_tokens_length() {
 		let tokens = vec![
 			MatcherToken::MatchAnyChar,
 			MatcherToken::MatchAnyChar,
@@ -272,15 +260,13 @@ mod match_words_tests {
 		];
 
 		assert_eq!(
-			match_words_from_tokens(&tokens, "", "", "", Some(&TEST_WORDS))?,
+			match_words_from_tokens(&tokens, "", "", "", Some(&TEST_WORDS)).unwrap(),
 			vec!["jjkk".to_string(), "kkll".to_string()]
 		);
-
-		Ok(())
 	}
 
 	#[test]
-	fn should_match_chars_on_tokens() -> Result<(), String> {
+	fn should_match_chars_on_tokens() {
 		let tokens = vec![
 			MatcherToken::MatchAnyChar,
 			MatcherToken::MatchAnyCharIn("ab".to_string()),
@@ -291,7 +277,7 @@ mod match_words_tests {
 		];
 
 		assert_eq!(
-			match_words_from_tokens(&tokens, "", "", "", Some(&TEST_WORDS))?,
+			match_words_from_tokens(&tokens, "", "", "", Some(&TEST_WORDS)).unwrap(),
 			vec!["aaabbb".to_string(), "bbbccc".to_string()]
 		);
 
@@ -302,7 +288,7 @@ mod match_words_tests {
 		];
 
 		assert_eq!(
-			match_words_from_tokens(&tokens, "", "", "", Some(&TEST_WORDS))?,
+			match_words_from_tokens(&tokens, "", "", "", Some(&TEST_WORDS)).unwrap(),
 			vec!["yenta".to_string(), "yes".to_string()]
 		);
 
@@ -315,15 +301,13 @@ mod match_words_tests {
 		];
 
 		assert_eq!(
-			match_words_from_tokens(&token, "", "", "", Some(&TEST_WORDS))?,
+			match_words_from_tokens(&token, "", "", "", Some(&TEST_WORDS)).unwrap(),
 			vec!["fffggg".to_string()]
 		);
-
-		Ok(())
 	}
 
 	#[test]
-	fn should_match_chars_on_tokens_within_globals() -> Result<(), String> {
+	fn should_match_chars_on_tokens_within_globals() {
 		let tokens = vec![
 			MatcherToken::MatchAnyChar,
 			MatcherToken::MatchAnyChar,
@@ -333,7 +317,7 @@ mod match_words_tests {
 		];
 
 		assert_eq!(
-			match_words_from_tokens(&tokens, "t", "", "ytanpem", Some(&TEST_WORDS))?,
+			match_words_from_tokens(&tokens, "t", "", "ytanpem", Some(&TEST_WORDS)).unwrap(),
 			vec!["yenta".to_string()]
 		);
 
@@ -347,10 +331,9 @@ mod match_words_tests {
 		let test_words = [
 			"blast", "flats", "loath", "slant", "slats", "stalk", "stall", "trail", "trawl",
 		];
-		let result = match_words_from_tokens(&tokens, "lat", "pesk", "", Some(&test_words))?;
+		let result =
+			match_words_from_tokens(&tokens, "lat", "pesk", "", Some(&test_words)).unwrap();
 
 		assert_eq!(result, vec!["trail", "trawl"]);
-
-		Ok(())
 	}
 }

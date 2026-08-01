@@ -1,21 +1,24 @@
 {
+	"format_on_save": "on",
+	"formatter": "prettier",
 	"preferred_line_length": 100,
+	"prettier": { "allowed": true },
+
+	"languages": {
+		"Rust": { "formatter": "language_server" },
+		"TOML": {
+			"language_servers": ["tombi"],
+			"formatter": { "language_server": { "name": "tombi" } }
+		}
+	},
 
 	"lsp": {
 		"rust-analyzer": {
 			"initialization_options": {
-				"binary": { "path": "~/.cargo/bin/rust-analyzer" },
 				"check": { "command": "clippy" },
 				"diagnostics": { "styleLints": { "enable": true } },
-				"rustfmt": { "extraArgs": ["+nightly"] },
-			},
-		},
-	},
-
-	"languages": {
-		"Rust": { "formatter": "language_server" },
-		"TOML": { "language_servers": ["tombi"], "formatter": "language_server" },
-		"YAML": { "formatter": "language_server" },
-		"JSON": { "formatter": "language_server" },
-	},
+				"rustfmt": { "extraArgs": ["+nightly"] }
+			}
+		}
+	}
 }

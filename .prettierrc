@@ -1,0 +1,5 @@
+{
+	"$schema": "https://json.schemastore.org/prettierrc",
+	"useTabs": true,
+	"overrides": [{ "files": ["*.{json,jsonc}"], "options": { "trailingComma": "none" } }]
+}

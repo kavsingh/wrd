@@ -1,7 +1,7 @@
 pub fn unique_string(str: &str) -> String {
-	str.chars().fold("".to_owned(), |mut acc: String, c| {
+	str.chars().fold(String::new(), |mut acc: String, c| {
 		if !acc.contains(c) {
-			acc.push(c)
+			acc.push(c);
 		}
 
 		acc

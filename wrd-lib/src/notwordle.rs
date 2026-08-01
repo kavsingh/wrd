@@ -10,25 +10,17 @@ pub struct Notwordle {
 	guess_results: Vec<Vec<GuessResultToken>>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum GuessResultToken {
 	Right(String),
 	Wrong(String),
 	WrongPosition(String),
 }
 
-impl PartialEq for GuessResultToken {
-	fn eq(&self, other: &Self) -> bool {
-		match (self, other) {
-			(Self::Right(a), Self::Right(b)) => a == b,
-			(Self::Wrong(a), Self::Wrong(b)) => a == b,
-			(Self::WrongPosition(a), Self::WrongPosition(b)) => a == b,
-			_ => false,
-		}
-	}
-}
-
 impl Notwordle {
+	/// # Errors
+	/// Errors if guess result token count does not match previous entries.
+	/// Propagates errors from `tokenize_guess_result`.
 	pub fn register_guess_result(&mut self, result: &str) -> Result<Vec<GuessResultToken>, String> {
 		let tokenized = tokenize_guess_result(result)?;
 
@@ -48,6 +40,8 @@ impl Notwordle {
 		Ok(tokenized)
 	}
 
+	/// # Errors
+	/// Propagates errors from `match_words_from_tokens`.
 	pub fn refine(&self, words: Option<&[&'static str]>) -> Result<Vec<&str>, String> {
 		let (tokens, include, exclude) = get_match_args_from_results(&self.guess_results);
 
@@ -55,17 +49,17 @@ impl Notwordle {
 	}
 }
 
+#[allow(clippy::expect_used)]
 static GUESS_TOKEN_REGEX: LazyLock<Regex> =
 	LazyLock::new(|| Regex::new(r"^([!?])?([a-z])$").expect("invalid guess regex"));
 
 fn tokenize_guess_result(input: &str) -> Result<Vec<GuessResultToken>, String> {
-	let entries: Vec<_> = input.split(" ").filter_map(non_empty_str).collect();
+	let entries: Vec<_> = input.split(' ').filter_map(non_empty_str).collect();
 	let mut result: Vec<GuessResultToken> = vec![];
 
-	for entry in entries.iter() {
-		let captures = match GUESS_TOKEN_REGEX.captures(entry) {
-			Ok(Some(cap)) => cap,
-			_ => return Err(format!("invalid input {entry}")),
+	for entry in entries {
+		let Ok(Some(captures)) = GUESS_TOKEN_REGEX.captures(entry) else {
+			return Err(format!("invalid input {entry}"));
 		};
 
 		match (
@@ -86,8 +80,8 @@ fn tokenize_guess_result(input: &str) -> Result<Vec<GuessResultToken>, String> {
 fn get_match_args_from_results(
 	guess_results: &[Vec<GuessResultToken>],
 ) -> (Vec<MatcherToken>, String, String) {
-	let mut include = "".to_string();
-	let mut exclude = "".to_string();
+	let mut include = String::new();
+	let mut exclude = String::new();
 	let mut match_tokens: Vec<MatcherToken> = vec![];
 
 	for result in guess_results {
@@ -104,9 +98,9 @@ fn get_match_args_from_results(
 			}
 
 			let resolved_op = match result_char {
-				GuessResultToken::Right(c) => MatcherToken::MatchAnyCharIn(c.to_string()),
+				GuessResultToken::Right(c) => MatcherToken::MatchAnyCharIn(c.clone()),
 				GuessResultToken::Wrong(c) | GuessResultToken::WrongPosition(c) => {
-					let candidate_op = MatcherToken::ExcludeAllCharsIn(c.to_string());
+					let candidate_op = MatcherToken::ExcludeAllCharsIn(c.clone());
 					let current_op = match_tokens.get(i);
 
 					match (&candidate_op, current_op) {
@@ -124,6 +118,7 @@ fn get_match_args_from_results(
 				}
 			};
 
+			#[allow(clippy::indexing_slicing)]
 			if i < match_tokens.len() {
 				match_tokens[i] = resolved_op;
 			} else {
@@ -140,46 +135,34 @@ fn get_match_args_from_results(
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tokenize_tests {
 	use super::*;
 
 	#[test]
 	fn should_error_on_invalid_input() {
-		let result = match tokenize_guess_result("p ?q !r aa") {
-			Ok(_) => panic!("should not pass"),
-			Err(message) => message,
-		};
-
-		assert_eq!(result, "invalid input aa");
-
-		let result = match tokenize_guess_result("p ??q !r a") {
-			Ok(_) => panic!("should not pass"),
-			Err(message) => message,
-		};
-
-		assert_eq!(result, "invalid input ??q");
-
-		let result = match tokenize_guess_result("p ?q !?r a") {
-			Ok(_) => panic!("should not pass"),
-			Err(message) => message,
-		};
-
-		assert_eq!(result, "invalid input !?r");
-
-		let result = match tokenize_guess_result("p? ?q !r a") {
-			Ok(_) => panic!("should not pass"),
-			Err(message) => message,
-		};
-
-		assert_eq!(result, "invalid input p?");
+		assert_eq!(
+			tokenize_guess_result("p ?q !r aa").unwrap_err(),
+			"invalid input aa"
+		);
+		assert_eq!(
+			tokenize_guess_result("p ??q !r a").unwrap_err(),
+			"invalid input ??q"
+		);
+		assert_eq!(
+			tokenize_guess_result("p ?q !?r a").unwrap_err(),
+			"invalid input !?r"
+		);
+		assert_eq!(
+			tokenize_guess_result("p? ?q !r a").unwrap_err(),
+			"invalid input p?"
+		);
 	}
 
 	#[test]
-	fn should_parse_guess_patterns() -> Result<(), String> {
-		let result = tokenize_guess_result("p ?l !a t !e")?;
-
+	fn should_parse_guess_patterns() {
 		assert_eq!(
-			result,
+			tokenize_guess_result("p ?l !a t !e").unwrap(),
 			vec![
 				GuessResultToken::Right("p".to_string()),
 				GuessResultToken::WrongPosition("l".to_string()),
@@ -188,18 +171,18 @@ mod tokenize_tests {
 				GuessResultToken::Wrong("e".to_string()),
 			]
 		);
-
-		Ok(())
 	}
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod match_args_tests {
 	use super::*;
 	use crate::match_words::MatcherToken;
 
 	#[test]
-	fn should_build_match_inputs_from_guesses() -> Result<(), String> {
+	#[allow(clippy::too_many_lines)]
+	fn should_build_match_inputs_from_guesses() {
 		// word is pilot
 
 		// plate
@@ -337,12 +320,10 @@ mod match_args_tests {
 		);
 		assert_eq!(include, "atm".to_string());
 		assert_eq!(exclude, "plecorsinz".to_string());
-
-		Ok(())
 	}
 
 	#[test]
-	fn should_refine_words() -> Result<(), String> {
+	fn should_refine_words() {
 		let mut nw = Notwordle::default();
 		let words = ["plate", "pastor", "panda", "datum"];
 
@@ -352,7 +333,5 @@ mod match_args_tests {
 		nw.register_guess_result("?m a t !z !a").unwrap();
 
 		assert_eq!(nw.refine(Some(&words)).unwrap(), vec!["datum"]);
-
-		Ok(())
 	}
 }

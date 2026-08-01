@@ -26,7 +26,7 @@ struct GuessResult {
 impl Default for GuessResult {
 	fn default() -> Self {
 		Self {
-			input: Input::new("".to_string()),
+			input: Input::new(String::new()),
 			tokenized: None,
 		}
 	}
@@ -44,41 +44,43 @@ pub struct NotWordle<'a> {
 impl NotWordle<'_> {
 	fn add_guess(&mut self) {
 		self.guesses.push(GuessResult::default());
-		self.edit_guess = Some((self.guesses.len() - 1) as u16);
+		self.edit_guess =
+			Some(u16::try_from(self.guesses.len().saturating_sub(1)).unwrap_or_default());
 	}
 
-	fn refresh_results(&mut self, state: &AppState) -> Result<()> {
+	fn refresh_results(&mut self, state: &AppState) {
 		let mut not_wordle = wrd_lib::Notwordle::default();
 
-		for guess in self.guesses.iter_mut() {
+		// @TODO: surface error
+		let Some(dict) = get_dictionary(&state.dictionary) else {
+			return;
+		};
+
+		for guess in &mut *self.guesses {
 			guess.tokenized = not_wordle
 				.register_guess_result(guess.input.value().trim())
-				.ok()
+				.ok();
 		}
 
-		match not_wordle.refine(Some(get_dictionary(&state.dictionary))) {
-			Ok(results) => {
-				self.results = results.iter().map(|s| s.to_string()).collect();
-				self.word_grid.update(&self.results);
-
-				Ok(())
-			}
-			// @TODO: surface error
-			Err(_) => Ok(()),
+		// @TODO: surface error
+		if let Ok(results) = not_wordle.refine(Some(dict)) {
+			self.results = results.into_iter().map(str::to_string).collect();
+			self.word_grid.update(&self.results);
 		}
 	}
 
 	fn forward_event_to_input(&mut self, event: &Event) {
 		if let Some(guess) = self
 			.edit_guess
-			.and_then(|i| self.guesses.get_mut(i as usize))
+			.and_then(|i| self.guesses.get_mut(usize::from(i)))
 		{
 			guess.input.handle_event(event);
 		}
 	}
 
 	fn render_inputs(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
-		let areas = Layout::vertical(vec![Length(1); self.guesses.len() + 1]).split(area);
+		let areas =
+			Layout::vertical(vec![Length(1); self.guesses.len().saturating_add(1)]).split(area);
 		let (intro, inputs) = areas.split_at_checked(1).unwrap_or_default();
 
 		if let Some(intro_area) = intro.first() {
@@ -89,11 +91,11 @@ impl NotWordle<'_> {
 
 		for (index, layout_area) in inputs.iter().enumerate() {
 			if let Some(guess) = self.guesses.get(index) {
-				let is_active = self.edit_guess.map(|v| v == index as u16).unwrap_or(false);
+				let is_active = self.edit_guess.is_some_and(|v| usize::from(v) == index);
 				let [label_area, input_area, formatted_area] =
 					Layout::horizontal([Length(5), Length(16), Min(20)]).areas(*layout_area);
 
-				Paragraph::new(format!(" <{}>", index_to_char(index as u16)))
+				Paragraph::new(format!(" <{}>", index_to_char(index)))
 					.style(if is_active {
 						Style::default().fg(tailwind::BLUE.c600).bold()
 					} else {
@@ -101,10 +103,12 @@ impl NotWordle<'_> {
 					})
 					.render(label_area, buf);
 
+				let input_width = usize::from(input_area.width);
+
 				Paragraph::new(guess.input.value())
 					.scroll((
 						0,
-						guess.input.visual_scroll(input_area.width as usize) as u16,
+						u16::try_from(guess.input.visual_scroll(input_width)).unwrap_or_default(),
 					))
 					.render(input_area, buf);
 
@@ -117,20 +121,22 @@ impl NotWordle<'_> {
 				}
 
 				if is_active {
-					let scroll = guess.input.visual_scroll(input_area.width as usize);
-					let x = guess.input.visual_cursor().max(scroll);
+					let scroll = guess.input.visual_scroll(input_width);
+					let x =
+						u16::try_from(guess.input.visual_cursor().max(scroll)).unwrap_or_default();
 
-					state.cursor_position = Some((input_area.x + x as u16, input_area.y));
+					state.cursor_position = Some((input_area.x.saturating_add(x), input_area.y));
 				}
 			}
 		}
 	}
 
 	fn commit_guess(&mut self, state: &AppState) {
-		self.refresh_results(state).unwrap_or(());
+		self.refresh_results(state);
 
 		if let Some(index) = self.edit_guess {
-			if index == (self.guesses.len() as u16) - 1 {
+			let len = u16::try_from(self.guesses.len()).unwrap_or_default();
+			if index == len.saturating_sub(1) {
 				self.add_guess();
 			} else {
 				self.go_to_next_guess();
@@ -142,9 +148,15 @@ impl NotWordle<'_> {
 		match self.edit_guess {
 			None => self.edit_guess = Some(0),
 			Some(current) => {
-				let next = (current + 1) % self.guesses.len() as u16;
+				let len = match u16::try_from(self.guesses.len()) {
+					Ok(l) if l > 0 => l,
+					_ => {
+						self.edit_guess = None;
+						return;
+					}
+				};
 
-				self.edit_guess = Some(next);
+				self.edit_guess = current.saturating_add(1).checked_rem(len).or(Some(0));
 			}
 		}
 	}
@@ -166,7 +178,7 @@ impl NotWordle<'_> {
 		self.word_grid.render_ref(grid_area, buf);
 	}
 
-	fn stop_editing(&mut self, state: &mut AppState) {
+	const fn stop_editing(&mut self, state: &mut AppState) {
 		self.edit_guess = None;
 		state.cursor_position = None;
 	}
@@ -177,36 +189,36 @@ fn format_tokenized(tokenized: &[GuessResultToken]) -> Vec<Span<'_>> {
 		.iter()
 		.cloned()
 		.map(|token| match token {
-			GuessResultToken::Right(c) => upper_span(c)
+			GuessResultToken::Right(c) => upper_span(&c)
 				.bg(tailwind::ORANGE.c400)
 				.fg(tailwind::WHITE)
 				.bold(),
-			GuessResultToken::WrongPosition(c) => upper_span(c)
+			GuessResultToken::WrongPosition(c) => upper_span(&c)
 				.bg(tailwind::BLUE.c400)
 				.fg(tailwind::WHITE)
 				.bold(),
-			GuessResultToken::Wrong(c) => upper_span(c).dim(),
+			GuessResultToken::Wrong(c) => upper_span(&c).dim(),
 		})
 		.collect()
 }
 
-fn upper_span<'a>(c: String) -> Span<'a> {
+fn upper_span<'a>(c: &str) -> Span<'a> {
 	Span::from(format!(" {} ", c.to_uppercase()))
 }
 
 // a = ascii 97
-fn index_to_char(index: u16) -> char {
-	(index as u8 + 97) as char
+fn index_to_char(index: usize) -> char {
+	u8::try_from(index)
+		.unwrap_or_default()
+		.saturating_add(97)
+		.into()
 }
 
-fn char_to_index(ch: char) -> Option<u16> {
-	let as_8 = ch as u8;
-
-	if as_8 < 97 {
-		None
-	} else {
-		Some((as_8 - 97) as u16)
-	}
+fn char_to_index(ch: char) -> usize {
+	u8::try_from(ch)
+		.unwrap_or_default()
+		.saturating_sub(97)
+		.into()
 }
 
 impl AppTabIo for NotWordle<'_> {
@@ -224,7 +236,7 @@ impl AppTabIo for NotWordle<'_> {
 		if !self.is_active {
 			self.stop_editing(state);
 		} else if !self.guesses.is_empty() {
-			self.edit_guess = Some((self.guesses.len() - 1) as u16)
+			self.edit_guess = u16::try_from(self.guesses.len().saturating_sub(1)).ok();
 		}
 	}
 
@@ -244,16 +256,14 @@ impl AppTabIo for NotWordle<'_> {
 				KeyCode::Char(c) if !is_editing => {
 					let target_index = char_to_index(c);
 
-					if let Some(index) = target_index
-						&& index < self.guesses.len() as u16
-					{
-						self.edit_guess = Some(index);
+					if target_index < self.guesses.len() {
+						self.edit_guess = u16::try_from(target_index).ok();
 					}
 				}
 				_ if is_editing => self.forward_event_to_input(event),
 				_ => (),
 			}
-		};
+		}
 
 		Ok(())
 	}
@@ -263,8 +273,9 @@ impl StatefulWidgetRef for NotWordle<'_> {
 	type State = AppState;
 
 	fn render_ref(&self, area: Rect, buf: &mut Buffer, state: &mut AppState) {
+		let len = u16::try_from(self.guesses.len()).unwrap_or_default();
 		let [inputs_area, results_area] =
-			Layout::vertical([Length(self.guesses.len() as u16 + 1), Fill(1)]).areas(area);
+			Layout::vertical([Length(len.saturating_add(1)), Fill(1)]).areas(area);
 
 		self.render_inputs(inputs_area, buf, state);
 		self.render_results(results_area, buf);

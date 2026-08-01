@@ -34,6 +34,8 @@ enum EventHandledStatus {
 }
 
 impl App<'_> {
+	/// # Errors
+	/// Propagates errors from `draw` and `handle_events`.
 	pub fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
 		let mut state = AppState::default();
 
@@ -44,6 +46,7 @@ impl App<'_> {
 			self.handle_events(&mut state)
 				.wrap_err("handle events failed")?;
 		}
+
 		Ok(())
 	}
 
@@ -51,20 +54,17 @@ impl App<'_> {
 		frame.render_stateful_widget(self, frame.area(), state);
 
 		if let Some(position) = state.cursor_position {
-			frame.set_cursor_position(position)
+			frame.set_cursor_position(position);
 		}
 	}
 
 	fn handle_events(&mut self, state: &mut AppState) -> Result<()> {
 		let received_event = event::read()?;
-		let mut should_forward = true;
-
-		if let Event::Key(key_event) = received_event {
-			should_forward = self
-				.handle_key_event(key_event, state)
-				.wrap_err_with(|| format!("handling key event failed:\n{key_event:#?}"))?
-				== EventHandledStatus::NotHandled
-		}
+		let should_forward = if let Event::Key(key_event) = received_event {
+			self.handle_key_event(key_event, state) == EventHandledStatus::NotHandled
+		} else {
+			false
+		};
 
 		if should_forward {
 			self.match_words
@@ -93,19 +93,21 @@ impl App<'_> {
 		&mut self,
 		key_event: KeyEvent,
 		state: &mut AppState,
-	) -> Result<EventHandledStatus> {
+	) -> EventHandledStatus {
 		match key_event.code {
 			KeyCode::Char('c') if key_event.modifiers.contains(KeyModifiers::CONTROL) => {
 				self.exit();
-				Ok(EventHandledStatus::Handled)
+				EventHandledStatus::Handled
 			}
+
 			KeyCode::Char(c) if c.is_ascii_digit() && state.cursor_position.is_none() => {
 				if let Some(num) = c.to_digit(10) {
-					self.go_to_tab(num as usize, state);
-				};
-				Ok(EventHandledStatus::Handled)
+					self.go_to_tab(usize::try_from(num).unwrap_or_default(), state);
+				}
+				EventHandledStatus::Handled
 			}
-			_ => Ok(EventHandledStatus::NotHandled),
+
+			_ => EventHandledStatus::NotHandled,
 		}
 	}
 
@@ -144,7 +146,7 @@ impl App<'_> {
 		]
 		.into_iter()
 		.enumerate()
-		.map(|(i, label)| format!(" {label} ({}) ", i + 1));
+		.map(|(i, label)| format!(" {label} ({}) ", i.saturating_add(1)));
 		let highlight_style = (Color::default(), tailwind::BLUE.c700);
 		let selected_tab_index = match &self.selected_tab {
 			Tab::MatchWords => 0,
@@ -164,6 +166,7 @@ impl App<'_> {
 			.render(area, buf);
 	}
 
+	#[allow(clippy::unused_self)]
 	fn render_footer(&self, area: Rect, buf: &mut Buffer) {
 		let block = Block::bordered().border_set(border::PLAIN);
 		let instructions = Line::from(vec![
@@ -195,7 +198,7 @@ impl App<'_> {
 		block.render(area, buf);
 	}
 
-	fn exit(&mut self) {
+	const fn exit(&mut self) {
 		self.exit = true;
 	}
 }
