@@ -1,6 +1,6 @@
 use std::sync::LazyLock;
 
-use fancy_regex::Regex;
+use regex::Regex;
 
 use crate::data::{Dictionary, get_dictionary};
 use crate::util::non_empty_str;
@@ -70,38 +70,30 @@ pub fn match_words_from_tokens<'a>(
 	let result: Vec<&str> = haystack
 		.unwrap_or_else(|| get_dictionary(&Dictionary::Moby).unwrap_or(empty))
 		.iter()
-		.filter(|word| match_word(word, &regex, include, exclude, within).unwrap_or(false))
+		.filter(|word| match_word(word, &regex, include, exclude, within))
 		.copied()
 		.collect();
 
 	Ok(result)
 }
 
-fn match_word(
-	word: &str,
-	matcher: &Regex,
-	include: &str,
-	exclude: &str,
-	within: &str,
-) -> Result<bool, String> {
+fn match_word(word: &str, matcher: &Regex, include: &str, exclude: &str, within: &str) -> bool {
 	// word can only contain letters within this group
 	if !within.is_empty() && word.chars().any(|c| !within.contains(c)) {
-		return Ok(false);
+		return false;
 	}
 
 	// word must include all of these letters
 	if !include.is_empty() && include.chars().any(|c| !word.contains(c)) {
-		return Ok(false);
+		return false;
 	}
 
 	// word must not include any of these letters
 	if !exclude.is_empty() && exclude.chars().any(|c| word.contains(c)) {
-		return Ok(false);
+		return false;
 	}
 
-	matcher
-		.is_match(word)
-		.map_err(|err| format!("could not match: {err}"))
+	matcher.is_match(word)
 }
 
 fn regex_from_tokens(tokens: &[MatcherToken]) -> Result<Regex, MatchWordsError> {
@@ -111,7 +103,7 @@ fn regex_from_tokens(tokens: &[MatcherToken]) -> Result<Regex, MatchWordsError> 
 			MatcherToken::MatchAnyChars => r"[a-z]*".to_string(),
 			MatcherToken::MatchAnyChar => r"[a-z]".to_string(),
 			MatcherToken::MatchAnyCharIn(chars) => format!("[{chars}]"),
-			MatcherToken::ExcludeAllCharsIn(chars) => format!("(?![{chars}])[a-z]"),
+			MatcherToken::ExcludeAllCharsIn(chars) => format!("([[a-z]--[{chars}]])"),
 		})
 		.collect::<String>();
 	let bounded = format!("^{pattern}$");
@@ -162,7 +154,7 @@ fn tokenize(input: &str) -> Result<MatcherToken, MatchWordsError> {
 		return Ok(MatcherToken::MatchAnyChar);
 	}
 
-	let Ok(Some(captures)) = MATCH_CHARS_TOKEN_REGEX.captures(input) else {
+	let Some(captures) = MATCH_CHARS_TOKEN_REGEX.captures(input) else {
 		return Err(MatchWordsError::InvalidPattern(input.to_string()));
 	};
 

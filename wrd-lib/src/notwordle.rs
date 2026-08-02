@@ -1,6 +1,6 @@
 use std::sync::LazyLock;
 
-use fancy_regex::Regex;
+use regex::Regex;
 
 use crate::match_words::{MatcherToken, match_words_from_tokens};
 use crate::util::{non_empty_str, unique_string};
@@ -76,7 +76,7 @@ fn tokenize_guess_result(input: &str) -> Result<Vec<GuessResultToken>, Notwordle
 	let mut result: Vec<GuessResultToken> = vec![];
 
 	for entry in entries {
-		let Ok(Some(captures)) = GUESS_TOKEN_REGEX.captures(entry) else {
+		let Some(captures) = GUESS_TOKEN_REGEX.captures(entry) else {
 			return Err(NotwordleError::InvalidGuessResultEntry(entry.to_string()));
 		};
 
